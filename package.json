@@ -1,9 +1,15 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "keywords": [
-    "antd", "virtualized table", "react", "react virtualized", "antd virtualized table"
+    "antd",
+    "virtualized table",
+    "react",
+    "react virtualized",
+    "antd virtualized table",
+    "infinity",
+    "scroll"
   ],
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -21,6 +27,7 @@
   },
   "homepage": "https://github.com/wubostc/virtualized-table-for-antd",
   "author": "wubooo",
+  "private": false,
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.2.2",
