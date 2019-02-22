@@ -1,6 +1,9 @@
 # virtualized-table-for-antd
-the virtualized table component for Ant Design
+## the virtualized table component for Ant Design
 
+
+
+quick start
 
 ```typescript
 
@@ -22,7 +25,20 @@ interface vt_opts {
   components={VTComponents({ id: 1000/*the id is immutable*/, height: 500 /*the height prop is variable*/ })}
 ...
 />
+```
 
+maybe you need to fix your style
+
+```less
+ant-table [vt] > table > .ant-table-tbody > tr > td {
+    padding: 8px;
+}
+```
+
+
+and more...
+
+```typescript
 
 /* API */
 function VTComponents(vt_opts: vt_opts)
@@ -72,5 +88,5 @@ class C extends React.Component {
 
 ```
 
-VTComponents
+enjoy!
 
