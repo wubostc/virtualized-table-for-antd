@@ -1,0 +1,29 @@
+{
+  "parser": "babel-eslint",
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module"
+  },
+  "env": {
+    "browser": true,
+    "es6": true,
+    "worker": true,
+    "node": true,
+    "shared-node-browser": true,
+    "commonjs": true
+  },
+  "rules": {
+    "no-extra-boolean-cast": "off",
+    "no-console": ["warn", { "allow": ["assert", "warn", "error", "debug", "info"]}],
+    "keyword-spacing": ["error"],
+    "space-before-blocks": ["error"],
+    "quotes": ["error", "double"],
+    "no-unused-vars": ["warn", { "vars": "all", "args": "none", "ignoreRestSiblings": true, "caughtErrors": "none" }],
+    "eqeqeq": ["warn", "always"],
+    "default-case": "error",
+    "semi": ["error", "always", { "omitLastInOneLineBlock": true }],
+    "no-useless-escape": "off"
+  },
+  "root": true
+}

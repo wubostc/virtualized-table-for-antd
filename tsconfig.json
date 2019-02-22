@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "allowJs": false,
+        "declaration": true,
+        "rootDir": "src",
+        "target": "es2018",
+        "newLine": "LF",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports" :true,
+        "jsx": "react",
+        "outDir": "lib"
+    },
+    "exclude": [
+        "es",
+        "lib"
+    ],
+}
