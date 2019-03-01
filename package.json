@@ -9,7 +9,8 @@
     "react virtualized",
     "antd virtualized table",
     "infinity",
-    "scroll"
+    "scroll",
+    "virtual"
   ],
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -64,6 +65,7 @@
   },
   "dependencies": {
     "@types/react": "^16.7.18",
+    "antd": "^3.13.6",
     "react": "^16.7.0"
   }
 }

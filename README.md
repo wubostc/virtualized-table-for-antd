@@ -41,7 +41,7 @@ and more...
 ```typescript
 
 /* API */
-function VTComponents(vt_opts: vt_opts)
+function VTComponents(vt_opts: vt_opts): TableComponents
 function getVTContext(id: number)
 function getVTComponents(id: number)
 

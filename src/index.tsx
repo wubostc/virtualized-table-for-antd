@@ -11,7 +11,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 
 import * as React from "react";
-
+import { TableComponents } from "antd/lib/table/interface";
 
 interface vt_ctx {
   head: number;
@@ -199,7 +199,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     }
 
     values.computed_h = computed_h;
-    values.re_computed = 0;
+    // values.re_computed = 0;
 
     update_wrap_style(values.wrap_inst.current, computed_h);
 
@@ -265,7 +265,7 @@ class VT extends React.Component<VTProps> {
 
     this.id = ID;
 
-    // hook to event
+    // hooks event
     this.scrollHook = this.scrollHook.bind(this);
 
 
@@ -273,6 +273,7 @@ class VT extends React.Component<VTProps> {
     values.possible_hight_per_tr = -1;
     values.computed_h = 0;
     values.load_the_trs_once = 0; // 0: init, 1: load once, 2: off
+    values.re_computed = 0;
     this.user_context = {};
 
     let reflection = values.reflection || [];
@@ -323,6 +324,12 @@ class VT extends React.Component<VTProps> {
 
       // force update for initialization
       this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+    }
+
+    // rerender
+    if (values.re_computed !== 0) {
+      values.re_computed = 0;
+      this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
     }
 
   }
@@ -436,7 +443,7 @@ function createVT(vt_opts: vt_opts) {
 
 
 export
-function VTComponents(vt_opts: vt_opts) {
+function VTComponents(vt_opts: vt_opts): TableComponents {
   const _store = createVT(vt_opts);
 
   return {

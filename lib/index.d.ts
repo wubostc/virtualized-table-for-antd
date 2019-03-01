@@ -1,4 +1,5 @@
 import * as React from "react";
+import { TableComponents } from "antd/lib/table/interface";
 interface vt_ctx {
     head: number;
     tail: number;
@@ -16,13 +17,7 @@ export declare const enum excellent_observer {
     update_self = 1,
     skip = 2
 }
-export declare function VTComponents(vt_opts: vt_opts): {
-    table: React.ReactType<any>;
-    body: {
-        wrapper: React.ReactType<any>;
-        row: React.ReactType<any>;
-    };
-};
+export declare function VTComponents(vt_opts: vt_opts): TableComponents;
 export declare function getVTContext(id: number): React.Context<vt_ctx>;
 export declare function getVTComponents(id: number): {
     table: React.ReactType<any>;
