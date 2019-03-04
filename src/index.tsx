@@ -100,6 +100,8 @@ class VTRow extends React.Component<VTRowProps> {
 
   public componentDidMount() {
     this.collect_h_tr(this.props.children[0].props.index, this.inst.current.clientHeight);
+    const values = store.get(ID);
+    if (values.load_the_trs_once === 0) values.load_the_trs_once = 1;
   }
 
   public componentDidUpdate() {
@@ -119,7 +121,12 @@ class VTRow extends React.Component<VTRowProps> {
 
 
     if (re_computed === 0) {
-      _computed_h += (val - row_height[idx]) || 0; // calculate diff
+      if (row_height[idx]) {
+        _computed_h += (val - row_height[idx]); // calculate diff
+      } else {
+        _computed_h = _computed_h - values.possible_hight_per_tr + val; // replace by real value
+      }
+      
     }
 
     // assignment
@@ -148,7 +155,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
   public constructor(props: VTWrapperProps, context: any) {
     super(props, context);
-    this.cnt = this.props.children.length;
+    this.cnt = 0;
     this.id = ID;
     this.VTWrapperRender = store.get(ID).VTWrapperRender;
   }
@@ -175,9 +182,19 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     );
   }
 
+  public componentDidMount() {
+    this.predict_height_and_update();
+  }
 
   public componentDidUpdate() {
+    this.predict_height_and_update();
+  }
 
+  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
+    return true;
+  }
+
+  public predict_height_and_update() {
     const values = store.get(this.id);
     const possible_hight_per_tr = values.possible_hight_per_tr;
 
@@ -201,16 +218,9 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     values.computed_h = computed_h;
     // values.re_computed = 0;
 
-    update_wrap_style(values.wrap_inst.current, computed_h);
-
-    if (values.load_the_trs_once === 0) values.load_the_trs_once = 1;
+    // update_wrap_style(values.wrap_inst.current, computed_h);
 
   }
-
-  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
-    return true;
-  }
-
 
   private set_tr_cnt(n: number, id: number) {
     const vals = store.get(id);
@@ -251,7 +261,7 @@ class VT extends React.Component<VTProps> {
 
   private user_context: any;
 
-  constructor(props: VTProps, context: any) {
+  public constructor(props: VTProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
     this.wrap_inst = React.createRef();
@@ -312,22 +322,33 @@ class VT extends React.Component<VTProps> {
   public componentDidMount() {
     this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
     this.wrap_inst.current.parentElement.onscroll = this.scrollHook;
+    
     store.set(this.id, { ...store.get(this.id), wrap_inst: this.wrap_inst });
+
+    const values = store.get(this.id);
+
+
+
+
+    update_wrap_style(values.wrap_inst.current, values.computed_h);
   }
 
   public componentDidUpdate() {
 
     const values = store.get(this.id);
 
+    update_wrap_style(values.wrap_inst.current, values.computed_h);
+
     if (values.load_the_trs_once === 1) {
       values.load_the_trs_once = 2;
 
       // force update for initialization
       this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
-    }
 
-    // rerender
-    if (values.re_computed !== 0) {
+    }
+    
+    if (values.re_computed !== 0) { // rerender
+      
       values.re_computed = 0;
       this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
     }
