@@ -22,6 +22,7 @@ interface vt_opts {
 // using in the antd table
 <Table
 ...
+  scroll={{ y: 100 }} // it's important!!!
   components={VTComponents({ id: 1000/*the id is immutable*/, height: 500 /*the height prop is variable*/ })}
 ...
 />
@@ -80,6 +81,7 @@ class C extends React.Component {
         }
       }]}
       components={VTComponents({ id: 1000, height: 500, reflection: ["form"] })}
+      scroll={{ y: 500 }}
       ...
     />
   }
