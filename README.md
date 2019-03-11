@@ -7,14 +7,15 @@ quick start
 
 ```typescript
 
-export
-interface vt_opts {
-  id: number; // the id of context
-  height: number; // the trs to render
-  overscanRowCount?: number; // default 1
-  VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element; // head and tail is index of the trs(children)
-  reflection?: string[] | string; // reflect to context
-  changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
+
+export interface vt_opts {
+    id: number;
+    height: number;
+    overscanRowCount?: number;
+    VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element;
+    reflection?: string[] | string;
+    changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
+    VTRefresh: () => void;
 }
 
 
@@ -22,7 +23,7 @@ interface vt_opts {
 // using in the antd table
 <Table
 ...
-  scroll={{ y: 100 }} // it's important!!!
+  scroll={{ y: 500 }} // it's important!!!
   components={VTComponents({ id: 1000/*the id is immutable*/, height: 500 /*the height prop is variable*/ })}
 ...
 />
@@ -42,10 +43,14 @@ and more...
 ```typescript
 
 /* API */
-function VTComponents(vt_opts: vt_opts): TableComponents
-function getVTContext(id: number)
-function getVTComponents(id: number)
-
+export declare function VTComponents(vt_opts: vt_opts): TableComponents;
+export declare function getVTContext(id: number): React.Context<vt_ctx>;
+export declare function getVTComponents(id: number): {
+    table: React.ReactType<any>;
+    wrapper: React.ReactType<any>;
+    row: React.ReactType<any>;
+};
+export declare function VTRefresh(id: number): void;
 
 // e.g. (decorator)
 class C extends React.Component {

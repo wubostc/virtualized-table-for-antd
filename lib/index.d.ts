@@ -12,6 +12,7 @@ export interface vt_opts {
     VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element;
     reflection?: string[] | string;
     changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
+    VTRefresh: () => void;
 }
 export declare const enum excellent_observer {
     update_self = 1,
@@ -24,4 +25,5 @@ export declare function getVTComponents(id: number): {
     wrapper: React.ReactType<any>;
     row: React.ReactType<any>;
 };
+export declare function VTRefresh(id: number): void;
 export {};

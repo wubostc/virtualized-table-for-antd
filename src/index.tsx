@@ -27,6 +27,7 @@ interface vt_opts {
   VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element;
   reflection?: string[] | string;
   changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
+  VTRefresh: () => void;
 }
 
 
@@ -104,11 +105,16 @@ class VTRow extends React.Component<VTRowProps> {
     if (values.load_the_trs_once === 0) values.load_the_trs_once = 1;
   }
 
+  // public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
+  //   return true;
+  // }
+
   public componentDidUpdate() {
     this.collect_h_tr(this.props.children[0].props.index, this.inst.current.clientHeight);
   }
 
   private collect_h_tr(idx: number, val: number) {
+    console.assert(!!val);
 
     const values = store.get(ID);
     const { computed_h = 0, row_height = [], re_computed, } = values;
@@ -190,9 +196,9 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     this.predict_height_and_update();
   }
 
-  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
-    return true;
-  }
+  // public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
+  //   return true;
+  // }
 
   public predict_height_and_update() {
     const values = store.get(this.id);
@@ -284,7 +290,9 @@ class VT extends React.Component<VTProps> {
     values.computed_h = 0;
     values.load_the_trs_once = 0; // 0: init, 1: load once, 2: off
     values.re_computed = 0;
+    values.VTRefresh = this.refresh.bind(this);
     this.user_context = {};
+
 
     let reflection = values.reflection || [];
     if (typeof reflection === "string") {
@@ -395,6 +403,11 @@ class VT extends React.Component<VTProps> {
     return [0 | i, 0 | j, 0 | accumulate_top];
   }
 
+  public refresh() {
+    const [head, tail, top] = this.scroll_with_computed(this.scrollTop, this.scrollLeft);
+    this.setState({ top, head, tail });
+  }
+
 
   private scrollHook(e: any) {
 
@@ -443,6 +456,9 @@ return { VT, Wrapper: VTWrapper, Row: VTRow, S };
 
 } // VT_CONTEXT
 
+function ASSERT_ID(id: number) {
+  console.assert(typeof id === "number" && id > 0);
+}
 
 function init(id: number) {
   const inside = store.get(id) || {} as storeValue;
@@ -455,7 +471,8 @@ function init(id: number) {
 }
 
 function createVT(vt_opts: vt_opts) {
-  console.assert(typeof vt_opts.id === "number" && typeof vt_opts.height === "number");
+  ASSERT_ID(vt_opts.id);
+  console.assert(typeof vt_opts.height === "number" && vt_opts.height > 0);
   const id = vt_opts.id;
   const inside = init(id);
   store.set(id, { ...vt_opts, ...inside, ...{ height: vt_opts.height } });
@@ -478,6 +495,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 
 export
 function getVTContext(id: number) {
+  ASSERT_ID(id);
   const inside = init(id);
   store.set(id, { ...inside });
   return store.get(id).context;
@@ -485,7 +503,15 @@ function getVTContext(id: number) {
 
 export
 function getVTComponents(id: number) {
+  ASSERT_ID(id);
   const inside = init(id);
   store.set(id, { ...inside });
   return store.get(id).components;
+}
+
+
+export
+function VTRefresh(id: number) {
+  ASSERT_ID(id);
+  store.get(id).VTRefresh();
 }

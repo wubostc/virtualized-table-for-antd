@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "keywords": [
     "antd",
@@ -27,7 +27,10 @@
     "url": "https://github.com/wubostc/virtualized-table-for-antd"
   },
   "homepage": "https://github.com/wubostc/virtualized-table-for-antd",
-  "author": "wubooo",
+  "author": {
+    "name": "wubooo",
+    "email": "913721086@qq.com"
+  },
   "private": false,
   "license": "MIT",
   "devDependencies": {
