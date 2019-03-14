@@ -13,6 +13,17 @@ export interface vt_opts {
     reflection?: string[] | string;
     changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
     VTRefresh: () => void;
+    VTScroll: (param?: {
+        top: number;
+        left: number;
+    }) => void | {
+        top: number;
+        left: number;
+    };
+    onScroll: ({ left, top }: {
+        top: number;
+        left: number;
+    }) => void;
 }
 export declare const enum excellent_observer {
     update_self = 1,
@@ -24,6 +35,13 @@ export declare function getVTComponents(id: number): {
     table: React.ReactType<any>;
     wrapper: React.ReactType<any>;
     row: React.ReactType<any>;
+};
+export declare function VTScroll(id: number, param?: {
+    top: number;
+    left: number;
+}): void | {
+    top: number;
+    left: number;
 };
 export declare function VTRefresh(id: number): void;
 export {};

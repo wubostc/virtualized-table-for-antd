@@ -28,6 +28,8 @@ interface vt_opts {
   reflection?: string[] | string;
   changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
   VTRefresh: () => void;
+  VTScroll: (param?: { top: number, left: number }) => void | { top: number, left: number };
+  onScroll: ({ left, top }: { top: number, left: number }) => void;
 }
 
 
@@ -189,18 +191,18 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   }
 
   public componentDidMount() {
-    this.predict_height_and_update();
+    this.predict_height();
   }
 
   public componentDidUpdate() {
-    this.predict_height_and_update();
+    this.predict_height();
   }
 
-  // public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
-  //   return true;
-  // }
+  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
+    return true;
+  }
 
-  public predict_height_and_update() {
+  public predict_height() {
     const values = store.get(this.id);
     const possible_hight_per_tr = values.possible_hight_per_tr;
 
@@ -256,6 +258,8 @@ class VT extends React.Component<VTProps> {
   private scrollTop: number;
   private scrollLeft: number;
   private timestamp: number;
+  private scoll_snapshot: boolean;
+  private store: storeValue;
 
   public state: {
     top: number;
@@ -273,6 +277,7 @@ class VT extends React.Component<VTProps> {
     this.wrap_inst = React.createRef();
     this.scrollTop = 0;
     this.scrollLeft = 0;
+    this.scoll_snapshot = false;
     this.state = {
       top: 0,
       head: 0,
@@ -291,7 +296,10 @@ class VT extends React.Component<VTProps> {
     values.load_the_trs_once = 0; // 0: init, 1: load once, 2: off
     values.re_computed = 0;
     values.VTRefresh = this.refresh.bind(this);
+    values.VTScroll = this.scroll.bind(this);
     this.user_context = {};
+
+    this.store = values;
 
 
     let reflection = values.reflection || [];
@@ -336,7 +344,7 @@ class VT extends React.Component<VTProps> {
     const values = store.get(this.id);
 
 
-
+    values.re_computed = 0;
 
     update_wrap_style(values.wrap_inst.current, values.computed_h);
   }
@@ -344,8 +352,22 @@ class VT extends React.Component<VTProps> {
   public componentDidUpdate() {
 
     const values = store.get(this.id);
+    this.store = values;
 
     update_wrap_style(values.wrap_inst.current, values.computed_h);
+
+    if (values.load_the_trs_once === 0) {
+      return;
+    }
+
+    if (this.scoll_snapshot) {
+      // this.scoll_snapshot = false;
+      values.load_the_trs_once = 2;
+      values.re_computed = 0;
+      this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
+      return;
+    }
+
 
     if (values.load_the_trs_once === 1) {
       values.load_the_trs_once = 2;
@@ -368,6 +390,9 @@ class VT extends React.Component<VTProps> {
     this.setState = (...args) => null;
   }
 
+  public shouldComponentUpdate(nextProps: VTProps, nextState: any) {
+    return true;
+  }
 
   private scroll_with_computed(top: number, left: number) {
     const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = store.get(this.id);
@@ -417,6 +442,16 @@ class VT extends React.Component<VTProps> {
       if (!this.timestamp) {
         this.timestamp = timestamp;
       }
+      cancelAnimationFrame(timestamp);
+
+      const values = this.store;
+
+      if (values.onScroll) {
+        const top = values.wrap_inst.current.parentElement.scrollTop;
+        const left = values.wrap_inst.current.parentElement.scrollLeft;
+        values.onScroll({ top, left });
+      }
+
       // console.info(timestamp - this.timestamp);
 
       // if (timestamp - this.timestamp < 16.7) {
@@ -433,15 +468,40 @@ class VT extends React.Component<VTProps> {
   
       this.scrollLeft = scrollLeft;
       this.scrollTop = scrollTop;
-      this.setState({ top, head, tail });
+
+      if (this.scoll_snapshot) {
+        this.setState({ top, head, tail }, () => {
+          this.scoll_snapshot = false;
+          values.wrap_inst.current.parentElement.scrollTo(scrollLeft, scrollTop);
+        });
+      } else {
+        this.setState({ top, head, tail });
+      }
 
       this.timestamp = timestamp;
 
-      cancelAnimationFrame(timestamp);
     });
 
 
   }
+
+  public scroll(param?: { top: number, left: number }): void | { top: number, left: number } {
+    if (param) {
+      if (typeof param.top === "number") {
+        this.scrollTop = param.top;
+      }
+      if (typeof param.left === "number") {
+        this.scrollLeft = param.left;
+      }
+    
+      this.scoll_snapshot = true;
+      this.forceUpdate();
+
+    } else {
+      return { top: this.scrollTop, left: this.scrollLeft };
+    }
+  }
+
 
 
   public static Wrapper = VTWrapper;
@@ -472,7 +532,7 @@ function init(id: number) {
 
 function createVT(vt_opts: vt_opts) {
   ASSERT_ID(vt_opts.id);
-  console.assert(typeof vt_opts.height === "number" && vt_opts.height > 0);
+  console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
   const id = vt_opts.id;
   const inside = init(id);
   store.set(id, { ...vt_opts, ...inside, ...{ height: vt_opts.height } });
@@ -509,6 +569,13 @@ function getVTComponents(id: number) {
   return store.get(id).components;
 }
 
+export
+function VTScroll(id: number, param?: { top: number, left: number }) {
+  ASSERT_ID(id);
+  const inside = init(id);
+  store.set(id, { ...inside });
+  return store.get(id).VTScroll(param);
+}
 
 export
 function VTRefresh(id: number) {

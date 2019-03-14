@@ -18,5 +18,44 @@ function VTComponents(vt_opts: vt_opts): TableComponents
 ```typescript
 export declare function VTRefresh(id: number): void;
 ```
-### 2. remove the func shouldComponentUpdate of VTWrapper
-### 3. remove the func shouldComponentUpdate of VTRow
+### <del>2. remove the func shouldComponentUpdate of VTWrapper</del>
+### <del>3. remove the func shouldComponentUpdate of VTRow</del>
+
+## 0.0.6
+### 1. add new API VTScroll (overload+2)
+
+e.g.
+
+```typescript
+
+class MyComponent extends React.Component {
+    ...
+    render() {
+        <Table
+            ...
+            scroll={{ y }}
+            components={VTComponents({ id: 1000, height: 500 })}
+        />
+    }
+
+    componentDitMount() {
+        VTScroll(1000, { top: 200 }) // to set
+        const { top, left } = VTScroll(1000); // to get
+    }
+}
+
+```
+
+### 2. add new API onScroll of the scroll event
+e.g.
+
+```typescript
+
+<Table
+    ...
+    scroll={{ y }}
+    components={
+        VTComponents({ id: 1000, height: y, onScoll: ({ left, top }) => console.log(left, top) })}
+/>
+
+```
