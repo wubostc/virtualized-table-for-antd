@@ -102,17 +102,17 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidMount() {
-    this.collect_h_tr(this.props.children[0].props.index, this.inst.current.clientHeight);
+    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
     const values = store.get(ID);
     if (values.load_the_trs_once === 0) values.load_the_trs_once = 1;
   }
 
-  // public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
-  //   return true;
-  // }
+  public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
+    return true;
+  }
 
   public componentDidUpdate() {
-    this.collect_h_tr(this.props.children[0].props.index, this.inst.current.clientHeight);
+    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
   }
 
   private collect_h_tr(idx: number, val: number) {
@@ -470,8 +470,9 @@ class VT extends React.Component<VTProps> {
       this.scrollTop = scrollTop;
 
       if (this.scoll_snapshot) {
+        this.scoll_snapshot = false;
         this.setState({ top, head, tail }, () => {
-          this.scoll_snapshot = false;
+          // this.scoll_snapshot = false;
           values.wrap_inst.current.parentElement.scrollTo(scrollLeft, scrollTop);
         });
       } else {
