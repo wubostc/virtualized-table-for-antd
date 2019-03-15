@@ -33,6 +33,12 @@ interface vt_opts {
 }
 
 
+const enum e_vt_state {
+  INIT,
+  LOADED,
+  RUNNING,
+  CACHE
+}
 
 interface storeValue extends vt_opts {
   components: {
@@ -41,7 +47,7 @@ interface storeValue extends vt_opts {
     row: React.ReactType
   };
   computed_h: number;
-  load_the_trs_once: 0 | 1 | 2;
+  load_the_trs_once: e_vt_state;
   possible_hight_per_tr: number;
   re_computed: number;
   row_height: number[];
@@ -104,7 +110,7 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidMount() {
     this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
     const values = store.get(ID);
-    if (values.load_the_trs_once === 0) values.load_the_trs_once = 1;
+    if (values.load_the_trs_once === e_vt_state.INIT) values.load_the_trs_once = e_vt_state.LOADED;
   }
 
   public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
@@ -141,10 +147,10 @@ class VTRow extends React.Component<VTRowProps> {
     row_height[idx] = val;
 
     // writeback
-    if (values.computed_h !== _computed_h) {
+    if (values.computed_h !== _computed_h && values.load_the_trs_once !== e_vt_state.INIT) {
       update_wrap_style(values.wrap_inst.current, _computed_h);
-      values.computed_h = _computed_h;
     }
+    values.computed_h = _computed_h;
     values.row_height = row_height;
   }
 }
@@ -206,7 +212,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     const values = store.get(this.id);
     const possible_hight_per_tr = values.possible_hight_per_tr;
 
-    if (possible_hight_per_tr === -1) return;
+    if (values.load_the_trs_once === e_vt_state.INIT) return;
 
     let { computed_h = 0, re_computed, } = values;
     const row_count = values.row_count;
@@ -239,7 +245,9 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
 
     // writeback
-    store.set(id, { ...vals, row_count: n, re_computed });
+    vals.row_count = n;
+    vals.re_computed = re_computed;
+    // store.set(id, { ...vals, row_count: n, re_computed });
   }
 
 }
@@ -291,12 +299,17 @@ class VT extends React.Component<VTProps> {
 
 
     const values = store.get(this.id);
-    values.possible_hight_per_tr = -1;
-    values.computed_h = 0;
-    values.load_the_trs_once = 0; // 0: init, 1: load once, 2: off
-    values.re_computed = 0;
+
+    if (values.load_the_trs_once !== e_vt_state.CACHE) {
+      values.possible_hight_per_tr = -1;
+      values.computed_h = 0;
+      values.re_computed = 0;
+    }
     values.VTRefresh = this.refresh.bind(this);
     values.VTScroll = this.scroll.bind(this);
+    values.load_the_trs_once = e_vt_state.INIT;
+
+
     this.user_context = {};
 
     this.store = values;
@@ -342,7 +355,7 @@ class VT extends React.Component<VTProps> {
     store.set(this.id, { ...store.get(this.id), wrap_inst: this.wrap_inst });
 
     const values = store.get(this.id);
-
+    this.store = values;
 
     values.re_computed = 0;
 
@@ -356,21 +369,21 @@ class VT extends React.Component<VTProps> {
 
     update_wrap_style(values.wrap_inst.current, values.computed_h);
 
-    if (values.load_the_trs_once === 0) {
+    if (values.load_the_trs_once === e_vt_state.INIT) {
       return;
     }
 
     if (this.scoll_snapshot) {
       // this.scoll_snapshot = false;
-      values.load_the_trs_once = 2;
+      values.load_the_trs_once = e_vt_state.RUNNING;
       values.re_computed = 0;
       this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
       return;
     }
 
 
-    if (values.load_the_trs_once === 1) {
-      values.load_the_trs_once = 2;
+    if (values.load_the_trs_once === e_vt_state.LOADED) {
+      values.load_the_trs_once = e_vt_state.RUNNING;
 
       // force update for initialization
       this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
@@ -386,7 +399,8 @@ class VT extends React.Component<VTProps> {
   }
 
   public componentWillUnmount() {
-    store.delete(this.id);
+    // store.delete(this.id);
+    this.store.load_the_trs_once = e_vt_state.CACHE;
     this.setState = (...args) => null;
   }
 
@@ -395,7 +409,8 @@ class VT extends React.Component<VTProps> {
   }
 
   private scroll_with_computed(top: number, left: number) {
-    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = store.get(this.id);
+    // const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = store.get(this.id);
+    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = this.store;
 
     let overscan = overscanRowCount;
 
@@ -536,7 +551,7 @@ function createVT(vt_opts: vt_opts) {
   console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
   const id = vt_opts.id;
   const inside = init(id);
-  store.set(id, { ...vt_opts, ...inside, ...{ height: vt_opts.height } });
+  store.set(id, { ...vt_opts, ...inside, ...{ height: vt_opts.height, onScroll: vt_opts.onScroll } });
   return inside;
 }
 

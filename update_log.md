@@ -59,3 +59,6 @@ e.g.
 />
 
 ```
+
+## 0.0.7
+### 1. now, the func VTScroll can correct restores last scroll state of antd table
