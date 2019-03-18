@@ -27,9 +27,9 @@ interface vt_opts {
   VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element;
   reflection?: string[] | string;
   changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
-  VTRefresh: () => void;
-  VTScroll: (param?: { top: number, left: number }) => void | { top: number, left: number };
-  onScroll: ({ left, top }: { top: number, left: number }) => void;
+  VTRefresh?: () => void;
+  VTScroll?: (param?: { top: number, left: number }) => void | { top: number, left: number };
+  onScroll?: ({ left, top }: { top: number, left: number }) => void;
 }
 
 
