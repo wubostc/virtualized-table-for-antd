@@ -20,7 +20,8 @@
   ],
   "scripts": {
     "clean": "rimraf lib dist es",
-    "build": "webpack --config webpack.config.js --profile --progress"
+    "build": "webpack --config webpack.config.js --profile --progress",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
