@@ -33,7 +33,7 @@ interface vt_opts {
 }
 
 
-const enum e_vt_state {
+enum e_vt_state {
   INIT,
   LOADED,
   RUNNING,
