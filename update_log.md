@@ -62,3 +62,7 @@ e.g.
 
 ## 0.0.7
 ### 1. now, the func VTScroll can correct restores last scroll state of antd table
+
+
+## 0.0.8
+### 1. the interface vt_opts no longer requires too many params
