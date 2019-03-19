@@ -66,3 +66,6 @@ e.g.
 
 ## 0.0.8
 ### 1. the interface vt_opts no longer requires too many params
+
+## 0.0.9
+### 1. rewrite const enum to enum

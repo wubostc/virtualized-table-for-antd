@@ -59,7 +59,7 @@ interface storeValue extends vt_opts {
 const store: Map<number, storeValue> = new Map();
 
 export
-const enum excellent_observer {
+enum excellent_observer {
   update_self = 0x0001,
   skip = 0x0001 << 1
 }
