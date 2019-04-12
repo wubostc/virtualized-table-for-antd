@@ -64,10 +64,9 @@ enum excellent_observer {
   skip = 0x0001 << 1
 }
 
-namespace VT_CONTEXT {
+const VT_CONTEXT = {
 
-export
-function Switch(ID: number) {
+Switch(ID: number) {
 
 
 const S = React.createContext<vt_ctx>({ head: 0, tail: 0 }, (prev, next) => {
@@ -530,7 +529,7 @@ return { VT, Wrapper: VTWrapper, Row: VTRow, S };
 
 } // Switch
 
-} // VT_CONTEXT
+}; // VT_CONTEXT
 
 function ASSERT_ID(id: number) {
   console.assert(typeof id === "number" && id > 0);
