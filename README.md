@@ -27,6 +27,7 @@ export interface vt_opts {
         top: number;
         left: number;
     }) => void;
+    destory?: boolean;
 }
 
 /* all APIs */
@@ -68,6 +69,40 @@ ant-table [vt] > table > .ant-table-tbody > tr > td {
 }
 ```
 
+```typescript
+// restore last state
+
+const ctx = { top: 0 };
+
+//--------- Users render
+render() {
+  <Table
+    scroll={{ y }}
+    components={VTComponents({ id: 1000, height: y, onScoll: ({ left, top }) => ctx.top = top })
+    ...
+  />
+}
+componentDidMount() {
+  VTScroll(1000, { top: ctx.top });
+}
+componentWillUnmount() {
+  ctx.top = VTScroll(1000).top;
+}
+
+//--------- About
+function () {
+  return "About...";
+}
+
+//--------- router render
+render() {
+  <Switch>
+    <Route component={Users} path="/users" />
+    <Route component={About} path="/about" />
+  </Switch>
+}
+
+```
 
 and more...
 

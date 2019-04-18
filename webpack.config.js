@@ -25,6 +25,8 @@ module.exports = {
         use: [{
           loader: "babel-loader"
         }, {
+          loader: "ts-loader"
+        }, {
           loader: "tslint-loader",
           options: {
             configFile: "./tslint.yaml",

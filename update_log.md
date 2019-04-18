@@ -69,3 +69,6 @@ e.g.
 
 ## 0.0.9
 ### 1. rewrite const enum to enum
+
+## 0.1.0
+### 1. by default, CACHE is enable, , set the prop destory to control whether the component is destroyed when it is uninstalled

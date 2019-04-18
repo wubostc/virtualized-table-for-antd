@@ -8,12 +8,13 @@
         "allowJs": false,
         "declaration": true,
         "rootDir": "src",
-        "target": "es2018",
+        "target": "esnext",
         "newLine": "LF",
         "esModuleInterop": true,
         "allowSyntheticDefaultImports" :true,
         "jsx": "react",
-        "outDir": "lib"
+        "outDir": "lib",
+        "alwaysStrict": true
     },
     "exclude": [
         "es",

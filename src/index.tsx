@@ -30,6 +30,7 @@ interface vt_opts {
   VTRefresh?: () => void;
   VTScroll?: (param?: { top: number, left: number }) => void | { top: number, left: number };
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
+  destory?: boolean; // default false
 }
 
 
@@ -64,9 +65,9 @@ enum excellent_observer {
   skip = 0x0001 << 1
 }
 
-const VT_CONTEXT = {
+class VT_CONTEXT {
 
-Switch(ID: number) {
+public static Switch(ID: number) {
 
 
 const S = React.createContext<vt_ctx>({ head: 0, tail: 0 }, (prev, next) => {
@@ -121,7 +122,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   private collect_h_tr(idx: number, val: number) {
-    console.assert(!!val);
+    if (val === 0) return console.assert(!!val);
 
     const values = store.get(ID);
     const { computed_h = 0, row_height = [], re_computed, } = values;
@@ -171,6 +172,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     this.cnt = 0;
     this.id = ID;
     this.VTWrapperRender = store.get(ID).VTWrapperRender;
+    const p: any = window;
+    p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
   }
 
   public render() {
@@ -399,7 +402,11 @@ class VT extends React.Component<VTProps> {
 
   public componentWillUnmount() {
     // store.delete(this.id);
-    this.store.load_the_trs_once = e_vt_state.CACHE;
+    if (this.store.destory) {
+      store.delete(this.id);
+    } else {
+      this.store.load_the_trs_once = e_vt_state.CACHE;
+    }
     this.setState = (...args) => null;
   }
 
@@ -529,7 +536,7 @@ return { VT, Wrapper: VTWrapper, Row: VTRow, S };
 
 } // Switch
 
-}; // VT_CONTEXT
+} // VT_CONTEXT
 
 function ASSERT_ID(id: number) {
   console.assert(typeof id === "number" && id > 0);
