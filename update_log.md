@@ -72,3 +72,6 @@ e.g.
 
 ## 0.1.0
 ### 1. by default, CACHE is enable, , set the prop destory to control whether the component is destroyed when it is uninstalled
+
+## 0.2.0
+### 1. removed two interfaces in vt_opts ( VTScroll and VTRefresh)

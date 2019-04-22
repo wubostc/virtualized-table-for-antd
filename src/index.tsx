@@ -13,10 +13,14 @@ The above copyright notice and this permission notice shall be included in all c
 import * as React from "react";
 import { TableComponents } from "antd/lib/table/interface";
 
+interface obj extends Object {
+  [field: string]: any;
+}
+
 interface vt_ctx {
   head: number;
   tail: number;
-  user_context?: object;
+  user_context?: obj;
 }
 
 export
@@ -24,11 +28,10 @@ interface vt_opts {
   id: number;
   height: number;
   overscanRowCount?: number;
-  VTWrapperRender?: (head: number, tail: number, children: any[], restProps: object) => JSX.Element;
+  VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
   reflection?: string[] | string;
   changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
-  VTRefresh?: () => void;
-  VTScroll?: (param?: { top: number, left: number }) => void | { top: number, left: number };
+
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
   destory?: boolean; // default false
 }
@@ -55,6 +58,9 @@ interface storeValue extends vt_opts {
   row_count: number;
   wrap_inst: React.RefObject<HTMLDivElement>;
   context: React.Context<vt_ctx>;
+
+  VTScroll?: (param?: { top: number, left: number }) => void | { top: number, left: number };
+  VTRefresh?: () => void;
 }
 
 const store: Map<number, storeValue> = new Map();
