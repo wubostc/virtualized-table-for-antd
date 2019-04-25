@@ -20,6 +20,7 @@ export interface vt_opts {
         left: number;
     }) => void;
     destory?: boolean;
+    debug?: boolean;
 }
 
 /* all APIs */

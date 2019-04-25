@@ -75,3 +75,9 @@ e.g.
 
 ## 0.2.0
 ### 1. removed two interfaces in vt_opts ( VTScroll and VTRefresh)
+
+## 0.2.1 (ignored)
+
+## 0.3.0
+### 1. optimize the program logic
+### 2. add debug feature
