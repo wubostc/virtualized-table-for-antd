@@ -34,6 +34,7 @@ interface vt_opts {
 
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
   destory?: boolean; // default false
+  debug?: boolean;
 }
 
 
@@ -73,8 +74,10 @@ enum excellent_observer {
 
 class VT_CONTEXT {
 
+// using closure
 public static Switch(ID: number) {
 
+const values = store.get(ID);
 
 const S = React.createContext<vt_ctx>({ head: 0, tail: 0 }, (prev, next) => {
   const ccb = store.get(ID).changedBits;
@@ -105,7 +108,6 @@ class VTRow extends React.Component<VTRowProps> {
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
-    // this.id = ID;
   }
 
   public render() {
@@ -115,7 +117,7 @@ class VTRow extends React.Component<VTRowProps> {
 
   public componentDidMount() {
     this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
-    const values = store.get(ID);
+
     if (values.load_the_trs_once === e_vt_state.INIT) values.load_the_trs_once = e_vt_state.LOADED;
   }
 
@@ -128,7 +130,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   private collect_h_tr(idx: number, val: number) {
-    if (val === 0) return console.assert(!!val);
+    if (val === 0) return console.assert(false, `the height of the tr can't be 0`);
 
     const values = store.get(ID);
     const { computed_h = 0, row_height = [], re_computed, } = values;
@@ -170,13 +172,12 @@ type VTWrapperProps = {
 class VTWrapper extends React.Component<VTWrapperProps> {
 
   private cnt: number;
-  private id: number;
   private VTWrapperRender?: storeValue["VTWrapperRender"];
 
   public constructor(props: VTWrapperProps, context: any) {
     super(props, context);
     this.cnt = 0;
-    this.id = ID;
+
     this.VTWrapperRender = store.get(ID).VTWrapperRender;
     const p: any = window;
     p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
@@ -189,7 +190,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
         {
           ({ head, tail }) => {
             if (this.cnt !== children.length) {
-              this.set_tr_cnt(children.length, this.id);
+              this.set_tr_cnt(children.length);
               this.cnt = children.length;
             }
 
@@ -217,7 +218,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   }
 
   public predict_height() {
-    const values = store.get(this.id);
+
     const possible_hight_per_tr = values.possible_hight_per_tr;
 
     if (values.load_the_trs_once === e_vt_state.INIT) return;
@@ -238,24 +239,21 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     }
 
     values.computed_h = computed_h;
-    // values.re_computed = 0;
 
-    // update_wrap_style(values.wrap_inst.current, computed_h);
 
   }
 
-  private set_tr_cnt(n: number, id: number) {
-    const vals = store.get(id);
-    const row_count = vals.row_count || 0;
+  private set_tr_cnt(n: number) {
+
+    const row_count = values.row_count || 0;
     let re_computed; // 0: no need to recalculate, > 0: add, < 0 subtract
 
     re_computed = n - row_count;
 
 
     // writeback
-    vals.row_count = n;
-    vals.re_computed = re_computed;
-    // store.set(id, { ...vals, row_count: n, re_computed });
+    values.row_count = n;
+    values.re_computed = re_computed;
   }
 
 }
@@ -273,9 +271,8 @@ class VT extends React.Component<VTProps> {
   private wrap_inst: React.RefObject<HTMLDivElement>;
   private scrollTop: number;
   private scrollLeft: number;
-  private timestamp: number;
+  // private timestamp: number;
   private scoll_snapshot: boolean;
-  private store: storeValue;
 
   public state: {
     top: number;
@@ -283,7 +280,6 @@ class VT extends React.Component<VTProps> {
     tail: number;
   };
 
-  private id: number;
 
   private user_context: any;
 
@@ -300,13 +296,11 @@ class VT extends React.Component<VTProps> {
       tail: 1,
     };
 
-    this.id = ID;
 
     // hooks event
     this.scrollHook = this.scrollHook.bind(this);
 
 
-    const values = store.get(this.id);
 
     if (values.load_the_trs_once !== e_vt_state.CACHE) {
       values.possible_hight_per_tr = -1;
@@ -320,7 +314,6 @@ class VT extends React.Component<VTProps> {
 
     this.user_context = {};
 
-    this.store = values;
 
 
     let reflection = values.reflection || [];
@@ -359,21 +352,13 @@ class VT extends React.Component<VTProps> {
   public componentDidMount() {
     this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
     this.wrap_inst.current.parentElement.onscroll = this.scrollHook;
-    
-    store.set(this.id, { ...store.get(this.id), wrap_inst: this.wrap_inst });
-
-    const values = store.get(this.id);
-    this.store = values;
-
+    values.wrap_inst = this.wrap_inst;
     values.re_computed = 0;
-
     update_wrap_style(values.wrap_inst.current, values.computed_h);
   }
 
   public componentDidUpdate() {
 
-    const values = store.get(this.id);
-    this.store = values;
 
     update_wrap_style(values.wrap_inst.current, values.computed_h);
 
@@ -408,10 +393,10 @@ class VT extends React.Component<VTProps> {
 
   public componentWillUnmount() {
     // store.delete(this.id);
-    if (this.store.destory) {
-      store.delete(this.id);
+    if (values.destory) {
+      store.delete(ID);
     } else {
-      this.store.load_the_trs_once = e_vt_state.CACHE;
+      values.load_the_trs_once = e_vt_state.CACHE;
     }
     this.setState = (...args) => null;
   }
@@ -421,8 +406,8 @@ class VT extends React.Component<VTProps> {
   }
 
   private scroll_with_computed(top: number, left: number) {
-    // const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = store.get(this.id);
-    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = this.store;
+
+    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = values;
 
     let overscan = overscanRowCount;
 
@@ -466,12 +451,10 @@ class VT extends React.Component<VTProps> {
     const { scrollTop, scrollLeft } = e.target;
 
     requestAnimationFrame((timestamp) => {
-      if (!this.timestamp) {
-        this.timestamp = timestamp;
-      }
+
       cancelAnimationFrame(timestamp);
 
-      const values = this.store;
+
 
       if (values.onScroll) {
         const top = values.wrap_inst.current.parentElement.scrollTop;
@@ -506,7 +489,7 @@ class VT extends React.Component<VTProps> {
         this.setState({ top, head, tail });
       }
 
-      this.timestamp = timestamp;
+      // this.timestamp = timestamp;
 
     });
 
@@ -551,32 +534,36 @@ function ASSERT_ID(id: number) {
 function init(id: number) {
   const inside = store.get(id) || {} as storeValue;
   if (!inside.components) {
+    store.set(id, inside);
     const { VT, Wrapper, Row, S } = VT_CONTEXT.Switch(id);
     inside.components = { table: VT, wrapper: Wrapper, row: Row };
     inside.context = S;
+    inside.load_the_trs_once = e_vt_state.INIT;
   }
   return inside;
 }
 
-function createVT(vt_opts: vt_opts) {
-  ASSERT_ID(vt_opts.id);
-  console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
-  const id = vt_opts.id;
-  const inside = init(id);
-  store.set(id, { ...vt_opts, ...inside, ...{ height: vt_opts.height, onScroll: vt_opts.onScroll } });
-  return inside;
-}
 
 
 export
 function VTComponents(vt_opts: vt_opts): TableComponents {
-  const _store = createVT(vt_opts);
+
+  ASSERT_ID(vt_opts.id);
+  console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
+
+  const inside = init(vt_opts.id);
+
+
+  Object.assign(inside, vt_opts);
+
+
+  if (inside.debug) console.log(`[${vt_opts.id}] vt: `, inside);
 
   return {
-    table: _store.components.table,
+    table: inside.components.table,
     body: {
-      wrapper: _store.components.wrapper,
-      row: _store.components.row
+      wrapper: inside.components.wrapper,
+      row: inside.components.row
     }
   };
 }
@@ -584,24 +571,18 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 export
 function getVTContext(id: number) {
   ASSERT_ID(id);
-  const inside = init(id);
-  store.set(id, { ...inside });
-  return store.get(id).context;
+  return init(id).context;
 }
 
 export
 function getVTComponents(id: number) {
   ASSERT_ID(id);
-  const inside = init(id);
-  store.set(id, { ...inside });
-  return store.get(id).components;
+  return init(id).components;
 }
 
 export
 function VTScroll(id: number, param?: { top: number, left: number }) {
   ASSERT_ID(id);
-  const inside = init(id);
-  store.set(id, { ...inside });
   return store.get(id).VTScroll(param);
 }
 
