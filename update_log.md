@@ -81,3 +81,7 @@ e.g.
 ## 0.3.0
 ### 1. optimize the program logic
 ### 2. add debug feature
+
+
+## 0.3.1
+### 1. fix minor style bug that using offsetHeight instead of clientHeight ([#2](https://github.com/wubostc/virtualized-table-for-antd/issues/2 "offsetHeight instead of clientHeight"))

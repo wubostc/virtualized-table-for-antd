@@ -116,7 +116,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidMount() {
-    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
+    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.scrollHeight);
 
     if (values.load_the_trs_once === e_vt_state.INIT) values.load_the_trs_once = e_vt_state.LOADED;
   }
@@ -126,7 +126,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidUpdate() {
-    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.clientHeight);
+    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.scrollHeight);
   }
 
   private collect_h_tr(idx: number, val: number) {
