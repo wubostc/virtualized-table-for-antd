@@ -130,9 +130,13 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   private collect_h_tr(idx: number, val: number) {
-    if (val === 0) return console.assert(false, `the height of the tr can't be 0`);
+    if (val === 0) {
+      if (values.debug) {
+        console.error(`[${ID}] the height of the tr can't be 0`);
+      }
+      return;
+    }
 
-    const values = store.get(ID);
     const { computed_h = 0, row_height = [], re_computed, } = values;
     
     let _computed_h = computed_h;
