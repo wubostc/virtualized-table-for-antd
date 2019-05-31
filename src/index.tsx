@@ -472,7 +472,10 @@ class VT extends React.Component<VTProps> {
       //   //
       // }
 
-      const [head, tail, top] = this.scroll_with_computed(scrollTop, scrollLeft);
+      const [head, tail, top] = this.scroll_with_computed(
+                                  this.scoll_snapshot ? this.scrollTop : scrollTop,
+                                  this.scoll_snapshot ? this.scrollLeft : scrollLeft
+                                );
 
       const prev_head = this.state.head,
             prev_tail = this.state.tail,
@@ -480,16 +483,18 @@ class VT extends React.Component<VTProps> {
   
       if (head === prev_head && tail === prev_tail && top === prev_top) return;
   
-      this.scrollLeft = scrollLeft;
-      this.scrollTop = scrollTop;
 
       if (this.scoll_snapshot) {
         this.scoll_snapshot = false;
         this.setState({ top, head, tail }, () => {
-          // this.scoll_snapshot = false;
-          values.wrap_inst.current.parentElement.scrollTo(scrollLeft, scrollTop);
+          // use this.scrollTop & scrollLeft as params directly, 
+          // because it wouldn't be changed until this.scoll_snapshot is false,
+          // and you should to know js closure.
+          values.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
         });
       } else {
+        this.scrollLeft = scrollLeft;
+        this.scrollTop = scrollTop;
         this.setState({ top, head, tail });
       }
 
