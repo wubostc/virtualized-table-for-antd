@@ -85,3 +85,8 @@ e.g.
 
 ## 0.3.1
 ### 1. fix minor style bug that using offsetHeight instead of clientHeight ([#2](https://github.com/wubostc/virtualized-table-for-antd/issues/2 "offsetHeight instead of clientHeight"))
+
+
+
+## 0.3.4
+### 1. fix VTScroll bug.
