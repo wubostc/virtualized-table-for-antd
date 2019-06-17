@@ -45,6 +45,12 @@ enum e_vt_state {
   CACHE
 }
 
+enum e_fixed {
+  NEITHER,
+  L,
+  R
+}
+
 interface storeValue extends vt_opts {
   components: {
     table: React.ReactType,
@@ -104,10 +110,21 @@ function update_wrap_style(warp: HTMLDivElement, h: number) {
 class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
+  private fixed: e_fixed;
 
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
+    const fixed = this.props.children[0]!.props!.column!.fixed;
+    
+    if (fixed === "right") {
+      this.fixed = e_fixed.R;
+    } else if (fixed === "left") {
+      this.fixed = e_fixed.L;
+    } else {
+      this.fixed = e_fixed.NEITHER;
+    }
+
   }
 
   public render() {
@@ -116,6 +133,8 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidMount() {
+    if (this.fixed !== e_fixed.NEITHER) return;
+
     this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
 
     if (values.load_the_trs_once === e_vt_state.INIT) values.load_the_trs_once = e_vt_state.LOADED;
@@ -126,6 +145,8 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidUpdate() {
+    if (this.fixed !== e_fixed.NEITHER) return;
+
     this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
   }
 
@@ -160,7 +181,17 @@ class VTRow extends React.Component<VTRowProps> {
 
     // writeback
     if (values.computed_h !== _computed_h && values.load_the_trs_once !== e_vt_state.INIT) {
-      update_wrap_style(values.wrap_inst.current, _computed_h);
+      switch (this.fixed) {
+        case e_fixed.L:
+          update_wrap_style(store.get(0 - ID).wrap_inst.current, _computed_h);
+          break;
+        case e_fixed.R:
+          update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, _computed_h);
+          break;
+        default:
+          update_wrap_style(values.wrap_inst.current, _computed_h);
+          break;
+      } 
     }
     values.computed_h = _computed_h;
     values.row_height = row_height;
@@ -178,6 +209,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   private cnt: number;
   private VTWrapperRender?: storeValue["VTWrapperRender"];
 
+  private fixed: e_fixed;
+
   public constructor(props: VTWrapperProps, context: any) {
     super(props, context);
     this.cnt = 0;
@@ -185,6 +218,15 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     this.VTWrapperRender = store.get(ID).VTWrapperRender;
     const p: any = window;
     p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
+
+    const fixed = this.props.children[0]!.props!.fixed;
+    if (fixed === "left") {
+      this.fixed = e_fixed.L;
+    } else if (fixed === "right") {
+      this.fixed = e_fixed.R;
+    } else {
+      this.fixed = e_fixed.NEITHER;
+    }
   }
 
   public render() {
@@ -210,10 +252,14 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   }
 
   public componentDidMount() {
+    if (this.fixed !== e_fixed.NEITHER) return;
+
     this.predict_height();
   }
 
   public componentDidUpdate() {
+    if (this.fixed !== e_fixed.NEITHER) return;
+
     this.predict_height();
   }
 
@@ -278,6 +324,8 @@ class VT extends React.Component<VTProps> {
   // private timestamp: number;
   private scoll_snapshot: boolean;
 
+  private fixed: e_fixed;
+
   public state: {
     top: number;
     head: number;
@@ -331,6 +379,16 @@ class VT extends React.Component<VTProps> {
       this.user_context[field] = bereflected[field];
     }
 
+    const fixed = this.props.children[0].props.fixed;
+    if (fixed === "left") {
+      this.fixed = e_fixed.L;
+      store.set(0 - ID, { } as storeValue);
+    } else if (fixed === "right") {
+      this.fixed = e_fixed.R;
+      store.set((1 << 31) + ID, { } as storeValue);
+    } else {
+      this.fixed = e_fixed.NEITHER;
+    }
   }
 
   public render() {
@@ -354,7 +412,24 @@ class VT extends React.Component<VTProps> {
   }
 
   public componentDidMount() {
-    this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
+    
+    switch (this.fixed) {
+      case e_fixed.L:
+        this.wrap_inst.current.setAttribute("vt-left", `[${ID}]`);
+        store.get(0 - ID).wrap_inst = this.wrap_inst;
+        return;
+
+      case e_fixed.R:
+        this.wrap_inst.current.setAttribute("vt-right", `[${ID}]`);
+        store.get((1 << 31) + ID).wrap_inst = this.wrap_inst;
+        return;
+
+      default:
+        this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
+        break;
+    }
+
+
     this.wrap_inst.current.parentElement.onscroll = this.scrollHook;
     values.wrap_inst = this.wrap_inst;
     values.re_computed = 0;
@@ -363,6 +438,11 @@ class VT extends React.Component<VTProps> {
 
   public componentDidUpdate() {
 
+    if (this.fixed === e_fixed.L) {
+      return update_wrap_style(store.get(0 - ID).wrap_inst.current, values.computed_h);
+    } else if (this.fixed === e_fixed.R) {
+      return update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, values.computed_h);
+    }
 
     update_wrap_style(values.wrap_inst.current, values.computed_h);
 
