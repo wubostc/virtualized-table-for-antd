@@ -439,8 +439,11 @@ class VT extends React.Component<VTProps> {
         break;
     }
 
-    // 模拟一次滚动行为
-    this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+    if (this.props.children[2].props.children.length) {
+      // simulate a event scroll once
+      this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+    }
+
   }
 
   public componentDidUpdate() {
@@ -586,6 +589,11 @@ class VT extends React.Component<VTProps> {
           if (l) l.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
           if (r) r.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
         });
+
+        // update to ColumnProps.fixed synchronously
+        const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+        if (l) l.lptr.setState({ top, head, tail });
+        if (r) r.rptr.setState({ top, head, tail });
       } else {
         this.scrollLeft = scrollLeft;
         this.scrollTop = scrollTop;
@@ -665,7 +673,13 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   Object.assign(inside, vt_opts);
 
 
-  if (inside.debug) console.log(`[${vt_opts.id}] vt: `, inside);
+  if (inside.debug) {
+    console.log(`[${vt_opts.id}] vt: `, inside);
+    if (store.has(0 - vt_opts.id))
+      console.log(`[${vt_opts.id}] vt-fixedleft: `, store.get(0 - vt_opts.id));
+    if (store.has((1 << 31) + vt_opts.id))
+      console.log(`[${vt_opts.id}] vt-fixedright: `, store.get((1 << 31) + vt_opts.id));
+  }
 
   return {
     table: inside.components.table,
