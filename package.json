@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "",
   "keywords": [
     "antd",
@@ -10,7 +10,9 @@
     "antd virtualized table",
     "infinity",
     "scroll",
-    "virtual"
+    "virtual",
+    "无限滚动表格",
+    "虚拟表格"
   ],
   "main": "lib/index.js",
   "module": "lib/index.js",

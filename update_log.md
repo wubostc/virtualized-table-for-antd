@@ -90,3 +90,9 @@ e.g.
 
 ## 0.3.4
 ### 1. fix VTScroll bug.
+
+
+## 0.4.0
+### 1. support for the opt ColumnProps.fixed ([#5](https://github.com/wubostc/virtualized-table-for-antd/issues/5 "不支持 fixed"))
+### 2. support for the fixed lists.
+### 3. compatible with ie9-11.
