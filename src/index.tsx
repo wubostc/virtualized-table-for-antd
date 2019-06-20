@@ -441,7 +441,11 @@ class VT extends React.Component<VTProps> {
 
     if (this.props.children[2].props.children.length) {
       // simulate a event scroll once
-      this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+      if (this.scoll_snapshot) {
+        this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
+      } else {
+        this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+      }
     }
 
   }
