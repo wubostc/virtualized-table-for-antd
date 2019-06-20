@@ -14,7 +14,7 @@
           "browsers": [
             "> 5%",
             "last 2 major versions",
-            "not ie >= 1",
+            "ie >= 9",
             "not ie_mob >= 1",
             "not bb >= 1",
             "not baidu >= 1",
