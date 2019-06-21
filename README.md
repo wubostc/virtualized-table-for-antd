@@ -9,7 +9,7 @@
 // the param of the func VTComponents
 interface vt_opts extends Object {
     id: number;
-    height?: number;
+    height?: number; // will using the Table.scroll.y if unset.
     overscanRowCount?: number;
     VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
     reflection?: string[] | string;
@@ -48,7 +48,12 @@ export declare function VTScroll(id: number, param?: {
 <Table
 ...
   scroll={{ y: 500 }} // it's important!!!
-  components={VTComponents({ id: 1000/*the id is immutable*/, height: 500 /*the height prop is variable*/ })}
+  components={
+    VTComponents({
+      id: 1000,    /*the id is immutable*/
+      height: 500, /*the height prop is NOT required*/
+    })
+  }
 ...
 />
 ```
