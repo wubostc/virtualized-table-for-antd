@@ -7,9 +7,9 @@
 ```typescript
 
 // the param of the func VTComponents
-export interface vt_opts {
+interface vt_opts extends Object {
     id: number;
-    height: number;
+    height?: number;
     overscanRowCount?: number;
     VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
     reflection?: string[] | string;

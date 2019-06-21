@@ -25,9 +25,9 @@ interface vt_ctx {
 }
 
 export
-interface vt_opts {
+interface vt_opts extends Object {
   id: number;
-  height: number;
+  height?: number;
   overscanRowCount?: number;
   VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
   reflection?: string[] | string;
@@ -527,7 +527,7 @@ class VT extends React.Component<VTProps> {
 
     let torender_h = 0, j = i;
     for (; j < row_count; ++j) {
-      if (torender_h > height) break;
+      if (torender_h > (height || this.wrap_inst.current.parentElement.offsetHeight)) break;
       torender_h += (row_height[j] || possible_hight_per_tr);
     }
 
@@ -669,7 +669,10 @@ export
 function VTComponents(vt_opts: vt_opts): TableComponents {
 
   ASSERT_ID(vt_opts.id);
-  console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
+
+  if (vt_opts.hasOwnProperty("height")) {
+    console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
+  }
 
   const inside = init(vt_opts.id);
 
