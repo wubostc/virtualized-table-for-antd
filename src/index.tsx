@@ -400,12 +400,12 @@ class VT extends React.Component<VTProps> {
     // const { computed_h } = store.get(this.id);
 
     const { style, children, ...rest } = this.props;
-    const _style = { ...style, position: "absolute", top } as React.CSSProperties;
+    const _style: React.CSSProperties = { ...style, position: "absolute", top };
 
     return (
       <div
         ref={this.wrap_inst}
-        style={{ display: "block", position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
+        style={{ position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
       >
         <table {...rest} ref={this.inst} style={_style}>
           <S.Provider value={{ tail, head, fixed: this.fixed, ...this.user_context }}>{children}</S.Provider>
