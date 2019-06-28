@@ -3,6 +3,10 @@
 
 ## [update_log.md](https://github.com/wubostc/virtualized-table-for-antd/blob/master/update_log.md)
 
+install
+```shell
+npm i --save virtualizedtableforantd
+```
 
 ```typescript
 
