@@ -92,7 +92,12 @@ e.g.
 ### 1. fix VTScroll bug.
 
 
-## 0.4.0
+## 0.4.0-beta.1
 ### 1. support for the opt ColumnProps.fixed ([#5](https://github.com/wubostc/virtualized-table-for-antd/issues/5 "不支持 fixed"))
 ### 2. support for the fixed lists.
 ### 3. compatible with ie9-11.
+
+## 0.4.0-beta.2
+### 1. show the warning when you don't have 'height' as a field in the vt_opts.
+### 2. add throttling to optimize scrolling.
+### 3. change the styles ([#5](https://github.com/wubostc/virtualized-table-for-antd/issues/9 "Style Error"))

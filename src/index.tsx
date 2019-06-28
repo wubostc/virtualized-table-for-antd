@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2019 wubooo
+Copyright (c) 2019 https://github.com/wubostc/
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -47,6 +47,7 @@ enum e_vt_state {
 }
 
 enum e_fixed {
+  UNKNOW = -1,
   NEITHER,
   L,
   R
@@ -108,9 +109,10 @@ type VTRowProps = {
   children: any[]
 };
 
-function update_wrap_style(warp: HTMLDivElement, h: number) {
+function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
   warp.style.height = `${h}px`;
   warp.style.maxHeight = `${h}px`;
+  // if (w) warp.style.width = `${w}px`;
 }
 
 class VTRow extends React.Component<VTRowProps> {
@@ -122,7 +124,7 @@ class VTRow extends React.Component<VTRowProps> {
     super(props, context);
     this.inst = React.createRef();
 
-    this.fixed = -1;
+    this.fixed = e_fixed.UNKNOW;
 
   }
 
@@ -222,7 +224,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     const p: any = window;
     p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
 
-    this.fixed = -1;
+    this.fixed = e_fixed.UNKNOW;
   }
 
   public render() {
@@ -320,7 +322,8 @@ class VT extends React.Component<VTProps> {
   private wrap_inst: React.RefObject<HTMLDivElement>;
   private scrollTop: number;
   private scrollLeft: number;
-  // private timestamp: number;
+  private timestamp: number;
+  private next: number;
   private scoll_snapshot: boolean;
 
   private fixed: e_fixed;
@@ -393,21 +396,24 @@ class VT extends React.Component<VTProps> {
     }
 
 
+    this.timestamp = 0;
+    this.next = 0;
   }
 
   public render() {
     const { head, tail, top } = this.state;
-    // const { computed_h } = store.get(this.id);
 
     const { style, children, ...rest } = this.props;
-    const _style: React.CSSProperties = { ...style, position: "absolute", top };
+    style.position = "absolute";
+    style.top = top;
+    const { width, ...rest_style } = style;
 
     return (
       <div
         ref={this.wrap_inst}
-        style={{ position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
+        style={{ width, position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
       >
-        <table {...rest} ref={this.inst} style={_style}>
+        <table {...rest} ref={this.inst} style={rest_style}>
           <S.Provider value={{ tail, head, fixed: this.fixed, ...this.user_context }}>{children}</S.Provider>
         </table>
       </div>
@@ -511,6 +517,8 @@ class VT extends React.Component<VTProps> {
 
     let overscan = overscanRowCount;
 
+    const offsetHeight = this.wrap_inst.current.parentElement.offsetHeight;
+
     let accumulate_top = 0, i = 0;
     for (; i < row_count; ++i) {
       if (accumulate_top > top) break;
@@ -527,7 +535,7 @@ class VT extends React.Component<VTProps> {
 
     let torender_h = 0, j = i;
     for (; j < row_count; ++j) {
-      if (torender_h > (height || this.wrap_inst.current.parentElement.offsetHeight)) break;
+      if (torender_h > (height || offsetHeight)) break;
       torender_h += (row_height[j] || possible_hight_per_tr);
     }
 
@@ -554,6 +562,20 @@ class VT extends React.Component<VTProps> {
 
       cancelAnimationFrame(timestamp);
 
+      // throttling...
+      if (this.next < 2) {
+        if (timestamp - this.timestamp > 16 || this.timestamp === 0) {
+          setTimeout(() => {
+            ++this.next;
+            this.scrollHook(e);
+          }, 0); // executed in the next frame
+          return;
+        } else if (this.timestamp === 0) {
+          this.timestamp = timestamp;
+        }
+      }
+      this.next = 0;
+      this.timestamp = timestamp;
 
 
       if (values.onScroll) {
@@ -562,11 +584,6 @@ class VT extends React.Component<VTProps> {
         values.onScroll({ top, left });
       }
 
-      // console.info(timestamp - this.timestamp);
-
-      // if (timestamp - this.timestamp < 16.7) {
-      //   //
-      // }
 
       const [head, tail, top] = this.scroll_with_computed(
                                   this.scoll_snapshot ? this.scrollTop : scrollTop,
@@ -609,7 +626,6 @@ class VT extends React.Component<VTProps> {
         if (r) r.rptr.setState({ top, head, tail });
       }
 
-      // this.timestamp = timestamp;
 
     });
 
@@ -672,6 +688,8 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 
   if (vt_opts.hasOwnProperty("height")) {
     console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
+  } else {
+    console.warn("VTComponents: it will reduce the performance when scrolling if there is no 'height' prop.");
   }
 
   const inside = init(vt_opts.id);
