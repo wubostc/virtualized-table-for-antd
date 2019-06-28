@@ -100,4 +100,4 @@ e.g.
 ## 0.4.0-beta.2
 ### 1. show the warning when you don't have 'height' as a field in the vt_opts.
 ### 2. add throttling to optimize scrolling.
-### 3. change the styles ([#5](https://github.com/wubostc/virtualized-table-for-antd/issues/9 "Style Error"))
+### 3. change the styles ([#9](https://github.com/wubostc/virtualized-table-for-antd/issues/9 "Style Error"))
