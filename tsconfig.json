@@ -18,6 +18,7 @@
     },
     "exclude": [
         "es",
-        "lib"
+        "lib",
+        "node_modules"
     ],
 }

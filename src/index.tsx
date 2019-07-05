@@ -26,8 +26,8 @@ interface vt_ctx {
 
 export
 interface vt_opts extends Object {
-  id: number;
-  height?: number;
+  readonly id: number;
+  height?: number; // will using the Table.scroll.y if unset.
   overscanRowCount?: number;
   VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
   reflection?: string[] | string;
@@ -134,7 +134,7 @@ class VTRow extends React.Component<VTRowProps> {
       <S.Consumer>
         {
           ({ fixed }) => {
-            if (this.fixed < 0) this.fixed = fixed;
+            if (this.fixed === e_fixed.UNKNOW) this.fixed = fixed;
             return <tr {...restProps} ref={this.inst}>{children}</tr>;
           }
         }
@@ -325,6 +325,7 @@ class VT extends React.Component<VTProps> {
   private timestamp: number;
   private next: number;
   private scoll_snapshot: boolean;
+  private guard_lock: 1 | 0;
 
   private fixed: e_fixed;
 
@@ -398,6 +399,8 @@ class VT extends React.Component<VTProps> {
 
     this.timestamp = 0;
     this.next = 0;
+
+    this.guard_lock = 0;
   }
 
   public render() {
@@ -555,27 +558,32 @@ class VT extends React.Component<VTProps> {
 
 
   private scrollHook(e: any) {
+    // if (this.guard_lock) return;
 
     const { scrollTop, scrollLeft } = e.target;
 
-    requestAnimationFrame((timestamp) => {
+    requestAnimationFrame((timestamp: number) => {
 
       cancelAnimationFrame(timestamp);
 
       // throttling...
-      if (this.next < 2) {
-        if (timestamp - this.timestamp > 16 || this.timestamp === 0) {
-          setTimeout(() => {
-            ++this.next;
-            this.scrollHook(e);
-          }, 0); // executed in the next frame
+      if (this.next < 2 && this.timestamp !== 0) {
+        if (timestamp === this.timestamp) {
           return;
-        } else if (this.timestamp === 0) {
+        }
+        if (timestamp - this.timestamp > 16) {
+          // executed in the next frame
+          ++this.next;
           this.timestamp = timestamp;
+          this.scrollHook(e);
+          return;
         }
       }
+
       this.next = 0;
       this.timestamp = timestamp;
+
+      // this.guard_lock = 1;
 
 
       if (values.onScroll) {
@@ -594,11 +602,13 @@ class VT extends React.Component<VTProps> {
             prev_tail = this.state.tail,
             prev_top = this.state.top;
   
-      if (head === prev_head && tail === prev_tail && top === prev_top) return;
   
 
       if (this.scoll_snapshot) {
         this.scoll_snapshot = false;
+
+        if (head === prev_head && tail === prev_tail && top === prev_top) return;
+
         this.setState({ top, head, tail }, () => {
           // use this.scrollTop & scrollLeft as params directly, 
           // because it wouldn't be changed until this.scoll_snapshot is false,
@@ -609,6 +619,8 @@ class VT extends React.Component<VTProps> {
           const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
           if (l) l.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
           if (r) r.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
+
+          this.guard_lock = 0;
         });
 
         // update to ColumnProps.fixed synchronously
@@ -616,9 +628,11 @@ class VT extends React.Component<VTProps> {
         if (l) l.lptr.setState({ top, head, tail });
         if (r) r.rptr.setState({ top, head, tail });
       } else {
+        if (head === prev_head && tail === prev_tail && top === prev_top) return;
+
         this.scrollLeft = scrollLeft;
         this.scrollTop = scrollTop;
-        this.setState({ top, head, tail });
+        this.setState({ top, head, tail }, () => this.guard_lock = 0);
 
         // update to ColumnProps.fixed synchronously
         const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
@@ -633,6 +647,7 @@ class VT extends React.Component<VTProps> {
   }
 
   public scroll(param?: { top: number, left: number }): void | { top: number, left: number } {
+    if (this.scoll_snapshot) return;
     if (param) {
       if (typeof param.top === "number") {
         this.scrollTop = param.top;
@@ -642,7 +657,12 @@ class VT extends React.Component<VTProps> {
       }
     
       this.scoll_snapshot = true;
-      this.forceUpdate();
+      // this.forceUpdate();
+      this.scrollHook({ target: {
+        scrollTop: this.scrollTop,
+        scrollLeft: this.scrollLeft
+        }
+      });
 
     } else {
       return { top: this.scrollTop, left: this.scrollLeft };
