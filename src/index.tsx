@@ -115,6 +115,17 @@ function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
   // if (w) warp.style.width = `${w}px`;
 }
 
+function log_debug(val: storeValue) {
+  const ts = new Date().getTime();
+  if (val.debug) {
+    console.log(`[${val.id}][${ts}] render vt`, val);
+    if (store.has(0 - val.id))
+      console.log(`[${val.id}][${ts}] render vt-fixedleft`, store.get(0 - val.id));
+    if (store.has((1 << 31) + val.id))
+      console.log(`[${val.id}][${ts}] render vt-fixedright`, store.get((1 << 31) + val.id));
+  }
+}
+
 class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
@@ -558,7 +569,7 @@ class VT extends React.Component<VTProps> {
 
 
   private scrollHook(e: any) {
-    // if (this.guard_lock) return;
+    if (this.guard_lock === 1) return;
 
     const { scrollTop, scrollLeft } = e.target;
 
@@ -583,7 +594,6 @@ class VT extends React.Component<VTProps> {
       this.next = 0;
       this.timestamp = timestamp;
 
-      // this.guard_lock = 1;
 
 
       if (values.onScroll) {
@@ -594,8 +604,8 @@ class VT extends React.Component<VTProps> {
 
 
       const [head, tail, top] = this.scroll_with_computed(
-                                  this.scoll_snapshot ? this.scrollTop : scrollTop,
-                                  this.scoll_snapshot ? this.scrollLeft : scrollLeft
+                                  scrollTop,
+                                  scrollLeft
                                 );
 
       const prev_head = this.state.head,
@@ -608,6 +618,10 @@ class VT extends React.Component<VTProps> {
         this.scoll_snapshot = false;
 
         if (head === prev_head && tail === prev_tail && top === prev_top) return;
+
+        this.guard_lock = 1;
+
+        log_debug(values);
 
         this.setState({ top, head, tail }, () => {
           // use this.scrollTop & scrollLeft as params directly, 
@@ -629,6 +643,10 @@ class VT extends React.Component<VTProps> {
         if (r) r.rptr.setState({ top, head, tail });
       } else {
         if (head === prev_head && tail === prev_tail && top === prev_top) return;
+
+        this.guard_lock = 1;
+
+        log_debug(values);
 
         this.scrollLeft = scrollLeft;
         this.scrollTop = scrollTop;
@@ -657,13 +675,7 @@ class VT extends React.Component<VTProps> {
       }
     
       this.scoll_snapshot = true;
-      // this.forceUpdate();
-      this.scrollHook({ target: {
-        scrollTop: this.scrollTop,
-        scrollLeft: this.scrollLeft
-        }
-      });
-
+      this.forceUpdate();
     } else {
       return { top: this.scrollTop, left: this.scrollLeft };
     }
@@ -717,13 +729,8 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 
   Object.assign(inside, vt_opts);
 
-
-  if (inside.debug) {
-    console.log(`[${vt_opts.id}] vt: `, inside);
-    if (store.has(0 - vt_opts.id))
-      console.log(`[${vt_opts.id}] vt-fixedleft: `, store.get(0 - vt_opts.id));
-    if (store.has((1 << 31) + vt_opts.id))
-      console.log(`[${vt_opts.id}] vt-fixedright: `, store.get((1 << 31) + vt_opts.id));
+  if (vt_opts.debug) {
+    console.log(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
   }
 
   return {
@@ -755,6 +762,7 @@ function VTScroll(id: number, param?: { top: number, left: number }) {
 
 export
 function VTRefresh(id: number) {
+  console.warn('VTRefresh will be deprecated in next release version.');
   ASSERT_ID(id);
   store.get(id).VTRefresh();
 }
