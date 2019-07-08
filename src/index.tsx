@@ -28,7 +28,7 @@ export
 interface vt_opts extends Object {
   readonly id: number;
   height?: number; // will using the Table.scroll.y if unset.
-  overscanRowCount?: number;
+  overscanRowCount?: number; // default 5
   VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
   reflection?: string[] | string;
   changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
@@ -727,7 +727,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   const inside = init(vt_opts.id);
 
 
-  Object.assign(inside, vt_opts);
+  Object.assign(inside, { overscanRowCount: 5 }, vt_opts);
 
   if (vt_opts.debug) {
     console.log(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
