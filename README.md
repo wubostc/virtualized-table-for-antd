@@ -14,7 +14,7 @@ npm i --save virtualizedtableforantd
 interface vt_opts extends Object {
     id: number;
     height?: number; // will using the Table.scroll.y if unset.
-    overscanRowCount?: number;
+    overscanRowCount?: number; // default 5
     VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
     reflection?: string[] | string;
     changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
@@ -22,7 +22,7 @@ interface vt_opts extends Object {
         top: number;
         left: number;
     }) => void;
-    destory?: boolean;
+    destory?: boolean; // default false
     debug?: boolean;
 }
 

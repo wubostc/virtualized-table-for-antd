@@ -101,3 +101,12 @@ e.g.
 ### 1. show the warning when you don't have 'height' as a field in the vt_opts.
 ### 2. add throttling to optimize scrolling.
 ### 3. change the styles ([#9](https://github.com/wubostc/virtualized-table-for-antd/issues/9 "Style Error"))
+
+
+## 0.4.0
+### 1. { debug: true, ... } to see more debugging details.
+### 2. fix VTScroll bug.
+### 3. using render-lock, VT can now renders stably.
+### 4. improved throttling.
+### 5. fix some problems in TS 3.5.
+### 6. the default value of vt_opts.overscanRowCount is now 5.
