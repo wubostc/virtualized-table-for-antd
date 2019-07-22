@@ -101,15 +101,15 @@ function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
   // if (w) warp.style.width = `${w}px`;
 }
 
-function log_debug(val: storeValue) {
+function log_debug(val: storeValue & obj) {
   if (val.debug) {
     val = { ...val };
     const ts = new Date().getTime();
-    console.log(`[${val.id}][${ts}] render vt`, val);
+    console.debug(`[${val.id}][${ts}] render vt`, val);
     if (store.has(0 - val.id))
-      console.log(`[${val.id}][${ts}] render vt-fixedleft`, store.get(0 - val.id));
+      console.debug(`[${val.id}][${ts}] render vt-fixedleft`, store.get(0 - val.id));
     if (store.has((1 << 31) + val.id))
-      console.log(`[${val.id}][${ts}] render vt-fixedright`, store.get((1 << 31) + val.id));
+      console.debug(`[${val.id}][${ts}] render vt-fixedright`, store.get((1 << 31) + val.id));
   }
 }
 
@@ -614,7 +614,7 @@ class VT extends React.Component<VTProps, {
             prev_tail = this.state.tail,
             prev_top = this.state.top;
   
-  
+      if (values.debug) console.debug(`[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`, scrollTop, scrollLeft);
 
       if (this.scoll_snapshot) {
         this.scoll_snapshot = false;
@@ -732,7 +732,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   Object.assign(inside, { overscanRowCount: 5 }, vt_opts);
 
   if (vt_opts.debug) {
-    console.log(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
+    console.debug(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
   }
 
   return {
