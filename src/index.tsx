@@ -21,7 +21,7 @@ interface vt_ctx {
   head: number;
   tail: number;
   fixed: e_fixed;
-  user_context?: obj;
+  [reflection: string]: any;
 }
 
 export
@@ -29,9 +29,7 @@ interface vt_opts extends Object {
   readonly id: number;
   height?: number; // will using the Table.scroll.y if unset.
   overscanRowCount?: number; // default 5
-  VTWrapperRender?: (head: number, tail: number, children: any[], restProps: obj) => JSX.Element;
   reflection?: string[] | string;
-  changedBits?: (prev: vt_ctx, next: vt_ctx) => number;
 
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
   destory?: boolean; // default false
@@ -90,19 +88,7 @@ public static Switch(ID: number) {
 
 const values = store.get(ID);
 
-const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 }, (prev, next) => {
-  const ccb = store.get(ID).changedBits;
-  if (ccb) {
-    return ccb(prev, next);
-  }
-
-  if (prev.head !== next.head || prev.tail !== next.tail) {
-    return excellent_observer.update_self | excellent_observer.skip;
-  }
-
-  return excellent_observer.skip;
-});
-
+const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 });
 
 
 type VTRowProps = {
@@ -116,8 +102,8 @@ function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
 }
 
 function log_debug(val: storeValue) {
-  const ts = new Date().getTime();
   if (val.debug) {
+    const ts = new Date().getTime();
     console.log(`[${val.id}][${ts}] render vt`, val);
     if (store.has(0 - val.id))
       console.log(`[${val.id}][${ts}] render vt-fixedleft`, store.get(0 - val.id));
@@ -223,7 +209,7 @@ type VTWrapperProps = {
 class VTWrapper extends React.Component<VTWrapperProps> {
 
   private cnt: number;
-  private VTWrapperRender?: storeValue["VTWrapperRender"];
+  private VTWrapperRender: (...args: any[]) => JSX.Element;
 
   private fixed: e_fixed;
 
@@ -231,7 +217,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     super(props, context);
     this.cnt = 0;
 
-    this.VTWrapperRender = store.get(ID).VTWrapperRender;
+    this.VTWrapperRender = null;
     const p: any = window;
     p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
 
@@ -241,7 +227,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   public render() {
     const { children, ...restProps } = this.props;
     return (
-      <S.Consumer unstable_observedBits={excellent_observer.update_self}>
+      <S.Consumer>
         {
           ({ head, tail, fixed }) => {
             
@@ -275,7 +261,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     this.predict_height();
   }
 
-  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: unknown) {
+  public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: any) {
     return true;
   }
 
@@ -325,9 +311,13 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 type VTProps = {
   children: any[];
   style: React.CSSProperties;
-};
+} & obj;
 
-class VT extends React.Component<VTProps> {
+class VT extends React.Component<VTProps, {
+  top: number;
+  head: number;
+  tail: number;
+}> {
 
   private inst: React.RefObject<HTMLTableElement>;
   private wrap_inst: React.RefObject<HTMLDivElement>;
@@ -340,14 +330,8 @@ class VT extends React.Component<VTProps> {
 
   private fixed: e_fixed;
 
-  public state: {
-    top: number;
-    head: number;
-    tail: number;
-  };
 
-
-  private user_context: any;
+  private user_context: obj;
 
   public constructor(props: VTProps, context: any) {
     super(props, context);
@@ -401,10 +385,10 @@ class VT extends React.Component<VTProps> {
       reflection = [reflection];
     }
 
-    const bereflected = this.props as any;
 
-    for (const field of reflection) {
-      this.user_context[field] = bereflected[field];
+
+    for (let i = 0; i < reflection.length; ++i) {
+      this.user_context[reflection[i]] = this.props[reflection[i]];
     }
 
 
@@ -485,7 +469,6 @@ class VT extends React.Component<VTProps> {
     }
 
     if (this.scoll_snapshot) {
-      // this.scoll_snapshot = false;
       values.load_the_trs_once = e_vt_state.RUNNING;
       values.re_computed = 0;
       this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
@@ -502,7 +485,6 @@ class VT extends React.Component<VTProps> {
     }
     
     if (values.re_computed !== 0) { // rerender
-      
       values.re_computed = 0;
       this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
     }
@@ -527,7 +509,7 @@ class VT extends React.Component<VTProps> {
 
   private scroll_with_computed(top: number, left: number) {
 
-    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount = 1, } = values;
+    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount } = values;
 
     let overscan = overscanRowCount;
 
@@ -562,6 +544,9 @@ class VT extends React.Component<VTProps> {
     return [0 | i, 0 | j, 0 | accumulate_top];
   }
 
+  /**
+   * @deprecated
+   */
   public refresh() {
     const [head, tail, top] = this.scroll_with_computed(this.scrollTop, this.scrollLeft);
     this.setState({ top, head, tail });
@@ -718,11 +703,11 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 
   ASSERT_ID(vt_opts.id);
 
-  if (vt_opts.hasOwnProperty("height")) {
+  if (Object.hasOwnProperty.call(vt_opts, "height")) {
     console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
-  } else {
+  }/* else {
     console.warn("VTComponents: it will reduce the performance when scrolling if there is no 'height' prop.");
-  }
+  }*/
 
   const inside = init(vt_opts.id);
 
