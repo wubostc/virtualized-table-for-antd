@@ -103,6 +103,7 @@ function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
 
 function log_debug(val: storeValue) {
   if (val.debug) {
+    val = { ...val };
     const ts = new Date().getTime();
     console.log(`[${val.id}][${ts}] render vt`, val);
     if (store.has(0 - val.id))
@@ -333,6 +334,9 @@ class VT extends React.Component<VTProps, {
 
   private user_context: obj;
 
+  /** 紧急数据 */
+  private pri_data: any;
+
   public constructor(props: VTProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
@@ -556,25 +560,38 @@ class VT extends React.Component<VTProps, {
   private scrollHook(e: any) {
     if (this.guard_lock === 1) return;
 
-    const { scrollTop, scrollLeft } = e.target;
 
     requestAnimationFrame((timestamp: number) => {
 
       cancelAnimationFrame(timestamp);
 
-      // throttling...
-      if (this.next < 2 && this.timestamp !== 0) {
-        if (timestamp === this.timestamp) {
-          return;
+      let scrollTop: number;
+      let scrollLeft: number;
+
+      if (!this.pri_data) {
+        scrollTop = e.target.scrollTop;
+        scrollLeft = e.target.scrollLeft;
+
+        // throttling...
+        if (this.next < 2 && this.timestamp !== 0) {
+          if ((timestamp | 0) === (this.timestamp | 0)) {
+            if ((e as Event).preventDefault) this.pri_data = e;
+            return;
+          }
+          if (timestamp - this.timestamp > 16) {
+            // executed in the next frame
+            ++this.next;
+            this.timestamp = timestamp;
+            this.scrollHook(e);
+            return;
+          }
         }
-        if (timestamp - this.timestamp > 16) {
-          // executed in the next frame
-          ++this.next;
-          this.timestamp = timestamp;
-          this.scrollHook(e);
-          return;
-        }
+      } else {
+        scrollTop = this.pri_data.target.scrollTop;
+        scrollLeft = this.pri_data.target.scrollLeft;
+        this.pri_data = null;
       }
+
 
       this.next = 0;
       this.timestamp = timestamp;
