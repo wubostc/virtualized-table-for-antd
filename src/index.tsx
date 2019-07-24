@@ -573,7 +573,7 @@ class VT extends React.Component<VTProps, {
         scrollLeft = e.target.scrollLeft;
 
         // throttling...
-        if (this.next < 2 && this.timestamp !== 0) {
+        if (this.next < 3 && this.timestamp !== 0) {
           if ((timestamp | 0) === (this.timestamp | 0)) {
             if ((e as Event).preventDefault) this.pri_data = e;
             return;
@@ -582,7 +582,11 @@ class VT extends React.Component<VTProps, {
             // executed in the next frame
             ++this.next;
             this.timestamp = timestamp;
-            this.scrollHook(e);
+            // this.scrollHook(e);
+
+            setTimeout(() => {
+              this.scrollHook(e);
+            }, this.next * 2 + 1);
             return;
           }
         }
