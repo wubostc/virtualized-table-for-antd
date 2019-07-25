@@ -1,3 +1,7 @@
+## 0.5.1
+  1. refactory `scrollHook` to optimize performance.
+  1. update README.md.
+
 ## 0.5.0
   1. fix the definition of `vt_ctx`.
   1. remove `VTWrapperRender` option.
