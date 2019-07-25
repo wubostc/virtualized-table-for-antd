@@ -563,12 +563,12 @@ class VT extends React.Component<VTProps, {
     // throttling...
     if (this.next < 3) {
       const tid = setTimeout(() => {
+        clearTimeout(tid);
         if (this.next >= 3) return;
         ++this.next;
         this.scrollHook(e);
-        clearTimeout(tid);
         e = null;
-      }, 0);
+      }, this.next);
       return;
     }
 
