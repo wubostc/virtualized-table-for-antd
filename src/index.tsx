@@ -96,8 +96,8 @@ type VTRowProps = {
 };
 
 function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
-  warp.style.height = `${h}px`;
-  warp.style.maxHeight = `${h}px`;
+  warp.style.height = `${h < 0 ? 0 : h}px`;
+  warp.style.maxHeight = `${h < 0 ? 0 : h}px`;
   // if (w) warp.style.width = `${w}px`;
 }
 
@@ -560,6 +560,23 @@ class VT extends React.Component<VTProps, {
   private scrollHook(e: any) {
     if (this.guard_lock === 1) return;
 
+    // throttling...
+    if (this.next < 3) {
+      const tid = setTimeout(() => {
+        if (this.next >= 3) return;
+        ++this.next;
+        this.scrollHook(e);
+        clearTimeout(tid);
+        e = null;
+      }, 0);
+      return;
+    }
+
+    if (values.debug)
+      console.debug(
+        `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
+        e.target.scrollTop,
+        e.target.scrollLeft);
 
     requestAnimationFrame((timestamp: number) => {
 
@@ -567,28 +584,18 @@ class VT extends React.Component<VTProps, {
 
       let scrollTop: number;
       let scrollLeft: number;
+      this.next = 0; // alaways to be 0.
 
       if (!this.pri_data) {
         scrollTop = e.target.scrollTop;
         scrollLeft = e.target.scrollLeft;
 
-        // throttling...
-        if (this.next < 3 && this.timestamp !== 0) {
-          if ((timestamp | 0) === (this.timestamp | 0)) {
-            if ((e as Event).preventDefault) this.pri_data = e;
-            return;
+        if ( this.timestamp && ((timestamp | 0) === (this.timestamp | 0)) ) {
+          if ((e as Event).preventDefault) {
+            this.pri_data = null;
+            this.pri_data = e;
           }
-          if (timestamp - this.timestamp > 16) {
-            // executed in the next frame
-            ++this.next;
-            this.timestamp = timestamp;
-            // this.scrollHook(e);
-
-            setTimeout(() => {
-              this.scrollHook(e);
-            }, this.next * 2 + 1);
-            return;
-          }
+          return;
         }
       } else {
         scrollTop = this.pri_data.target.scrollTop;
@@ -597,15 +604,12 @@ class VT extends React.Component<VTProps, {
       }
 
 
-      this.next = 0;
       this.timestamp = timestamp;
 
 
 
       if (values.onScroll) {
-        const top = values.wrap_inst.current.parentElement.scrollTop;
-        const left = values.wrap_inst.current.parentElement.scrollLeft;
-        values.onScroll({ top, left });
+        values.onScroll({ top: scrollTop, left: scrollLeft });
       }
 
 
@@ -617,8 +621,7 @@ class VT extends React.Component<VTProps, {
       const prev_head = this.state.head,
             prev_tail = this.state.tail,
             prev_top = this.state.top;
-  
-      if (values.debug) console.debug(`[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`, scrollTop, scrollLeft);
+
 
       if (this.scoll_snapshot) {
         this.scoll_snapshot = false;
