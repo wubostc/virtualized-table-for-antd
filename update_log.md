@@ -1,3 +1,9 @@
+## 0.5.4
+  1. fix some bugs.
+
+## 0.5.3
+  1. fix `debug` bug when the param `e` is `null`.
+
 ## 0.5.2
   1. refactory `scrollHook`.
 
