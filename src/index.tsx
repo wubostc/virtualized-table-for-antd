@@ -593,7 +593,7 @@ class VT extends React.Component<VTProps, {
       if (skip) return;
     }
 
-    if (values.debug)
+    if (e && values.debug)
     console.debug(
       `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
       e.target.scrollTop,
