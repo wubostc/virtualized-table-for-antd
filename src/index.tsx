@@ -169,7 +169,7 @@ class VTRow extends React.Component<VTRowProps> {
       return;
     }
 
-    const { computed_h = 0, row_height = [], re_computed, } = values;
+    const { computed_h = 0, row_height = [] } = values;
     
     let _computed_h = computed_h;
     if (values.possible_hight_per_tr === -1) {
@@ -178,13 +178,10 @@ class VTRow extends React.Component<VTRowProps> {
     }
 
 
-    if (re_computed === 0) {
-      if (row_height[idx]) {
-        _computed_h += (val - row_height[idx]); // calculate diff
-      } else {
-        _computed_h = _computed_h - values.possible_hight_per_tr + val; // replace by real value
-      }
-      
+    if (row_height[idx]) {
+      _computed_h += (val - row_height[idx]); // calculate diff
+    } else {
+      _computed_h = _computed_h - values.possible_hight_per_tr + val; // replace by real value
     }
 
     // assignment
@@ -282,11 +279,17 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     /* predicted height */
     if (re_computed < 0) {
       for (let i = row_count; re_computed < 0; ++i, ++re_computed) {
-        computed_h -= (row_height[i] || possible_hight_per_tr);
+        if (!row_height[i]) {
+          row_height[i] = possible_hight_per_tr;
+        }
+        computed_h -= row_height[i];
       }
     } else if (re_computed > 0) {
       for (let i = row_count - 1; re_computed > 0; --i, --re_computed) {
-        computed_h += (row_height[i] || possible_hight_per_tr);
+        if (!row_height[i]) {
+          row_height[i] = possible_hight_per_tr;
+        }
+        computed_h += row_height[i];
       }
     }
 
@@ -667,6 +670,11 @@ class VT extends React.Component<VTProps, {
 
         if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
       });
+
+      // update to ColumnProps.fixed synchronously
+      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+      if (l) l.lptr.setState({ top, head, tail });
+      if (r) r.rptr.setState({ top, head, tail });
       return;
     }
 
