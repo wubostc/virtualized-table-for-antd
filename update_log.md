@@ -1,3 +1,6 @@
+## 0.5.2
+  1. refactory `scrollHook`.
+
 ## 0.5.1
   1. refactory `scrollHook` to optimize performance.
   1. update README.md.
