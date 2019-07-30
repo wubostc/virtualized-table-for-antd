@@ -75,11 +75,14 @@ interface storeValue extends vt_opts {
 
 const store: Map<number, storeValue> = new Map();
 
-// export
-// enum excellent_observer {
-//   update_self = 0x0001,
-//   skip = 0x0001 << 1
-// }
+const SCROLLEVT_NULL       = (0<<0);
+const SCROLLEVT_INIT       = (1<<0)
+const SCROLLEVT_RECOMPUTE  = (1<<1);
+const SCROLLEVT_RESTORETO  = (1<<2);
+const SCROLLEVT_NATIVE     = (1<<3);
+const SCROLLEVT_MASK       = (0x7); // The mask exclueds native event.
+const SCROLLEVT_BARRIER    = (1<<4); // It only for INIT, RECOMPUTE and RESTORETO.
+
 
 class VT_CONTEXT {
 
@@ -324,18 +327,17 @@ class VT extends React.Component<VTProps, {
   private wrap_inst: React.RefObject<HTMLDivElement>;
   private scrollTop: number;
   private scrollLeft: number;
-  private timestamp: number;
-  private next: number;
-  private scoll_snapshot: boolean;
   private guard_lock: 1 | 0;
-
   private fixed: e_fixed;
 
 
   private user_context: obj;
 
-  /** 紧急数据 */
-  private pri_data: any;
+
+  private fast_consolidation_event: { top: number, left: number, flags: number };
+  private delay_events: Array<{ target: { scrollTop: number, scrollLeft: number }, flags?: number } & Event>;
+  private throttling: number;
+  private restoring: boolean;
 
   public constructor(props: VTProps, context: any) {
     super(props, context);
@@ -343,7 +345,7 @@ class VT extends React.Component<VTProps, {
     this.wrap_inst = React.createRef();
     this.scrollTop = 0;
     this.scrollLeft = 0;
-    this.scoll_snapshot = false;
+    this.restoring = false;
     this.state = {
       top: 0,
       head: 0,
@@ -396,10 +398,12 @@ class VT extends React.Component<VTProps, {
     }
 
 
-    this.timestamp = 0;
-    this.next = 0;
-
     this.guard_lock = 0;
+
+    this.delay_events = [];
+    this.fast_consolidation_event = { top: 0, left: 0, flags: SCROLLEVT_NULL };
+    this.update_self = this.update_self.bind(this);
+    this.throttling = 0;
   }
 
   public render() {
@@ -448,11 +452,20 @@ class VT extends React.Component<VTProps, {
     }
 
     if (this.props.children[2].props.children.length) {
+      // set state of vt on didMount if it has children.
+      values.load_the_trs_once = e_vt_state.RUNNING;
+
       // simulate a event scroll once
-      if (this.scoll_snapshot) {
-        this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
+      if (this.fast_consolidation_event.flags & SCROLLEVT_RESTORETO) {
+        this.scrollHook({
+          target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
+          flags: SCROLLEVT_INIT & SCROLLEVT_RESTORETO,
+        });
       } else {
-        this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
+        this.scrollHook({
+          target: { scrollTop: 0, scrollLeft: 0 },
+          flags: SCROLLEVT_INIT,
+        });
       }
     }
 
@@ -472,27 +485,34 @@ class VT extends React.Component<VTProps, {
       return;
     }
 
-    if (this.scoll_snapshot) {
-      values.load_the_trs_once = e_vt_state.RUNNING;
-      values.re_computed = 0;
-      this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
-      return;
-    }
-
 
     if (values.load_the_trs_once === e_vt_state.LOADED) {
       values.load_the_trs_once = e_vt_state.RUNNING;
 
       // force update for initialization
-      this.scrollHook({ target: { scrollTop: 0, scrollLeft: 0 } });
-
-    }
-    
-    if (values.re_computed !== 0) { // rerender
-      values.re_computed = 0;
-      this.scrollHook({ target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft } });
+      this.scrollHook({
+        target: { scrollTop: 0, scrollLeft: 0 },
+        flags: SCROLLEVT_INIT,
+      });
     }
 
+    if (values.load_the_trs_once === e_vt_state.RUNNING) {
+      if (this.restoring) {
+        this.restoring = false;
+        this.scrollHook({
+          target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
+          flags: SCROLLEVT_RESTORETO,
+        });
+      }
+
+      if (values.re_computed !== 0) { // rerender
+        values.re_computed = 0;
+        this.scrollHook({
+          target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
+          flags: SCROLLEVT_RECOMPUTE,
+        });
+      }
+    }
   }
 
   public componentWillUnmount() {
@@ -511,7 +531,7 @@ class VT extends React.Component<VTProps, {
     return true;
   }
 
-  private scroll_with_computed(top: number, left: number) {
+  private scroll_with_computed(top: number) {
 
     const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount } = values;
 
@@ -552,142 +572,223 @@ class VT extends React.Component<VTProps, {
    * @deprecated
    */
   public refresh() {
-    const [head, tail, top] = this.scroll_with_computed(this.scrollTop, this.scrollLeft);
+    const [head, tail, top] = this.scroll_with_computed(this.scrollTop);
     this.setState({ top, head, tail });
   }
 
 
   private scrollHook(e: any) {
-    if (this.guard_lock === 1) return;
+    let skip = 0;
+    const de = this.delay_events;
+    if (e) {
+      if (e.flags) {
+        for (let i = 0; i < de.length; ++i) {
+          // prevent repeat event for 10ms.
+          if (e.flags & de[i].flags) return;
 
-    // throttling...
-    if (this.next < 3) {
-      const tid = setTimeout(() => {
-        clearTimeout(tid);
-        if (this.next >= 3) return;
-        ++this.next;
-        this.scrollHook(e);
-        e = null;
-      }, this.next);
-      return;
+          if (!skip && de[i].flags & SCROLLEVT_MASK) skip = 1;
+        }
+      }
+      de.push(e);
+      if (skip) return;
     }
 
     if (values.debug)
-      console.debug(
-        `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
-        e.target.scrollTop,
-        e.target.scrollLeft);
+    console.debug(
+      `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
+      e.target.scrollTop,
+      e.target.scrollLeft);
 
-    requestAnimationFrame((timestamp: number) => {
+    if (this.throttling === 1) return;
 
-      cancelAnimationFrame(timestamp);
+    if (this.guard_lock === 1) return;
 
-      let scrollTop: number;
-      let scrollLeft: number;
-      this.next = 0; // alaways to be 0.
+    if (de.length === 0) return;
 
-      if (!this.pri_data) {
-        scrollTop = e.target.scrollTop;
-        scrollLeft = e.target.scrollLeft;
+    this.throttling = 1;
 
-        if ( this.timestamp && ((timestamp | 0) === (this.timestamp | 0)) ) {
-          if ((e as Event).preventDefault) {
-            this.pri_data = null;
-            this.pri_data = e;
-          }
-          return;
-        }
-      } else {
-        scrollTop = this.pri_data.target.scrollTop;
-        scrollLeft = this.pri_data.target.scrollLeft;
-        this.pri_data = null;
+    setTimeout(() => {
+
+      let flags = SCROLLEVT_NULL;
+      let cd = this.delay_events.length;
+      while(cd--) {
+        const c = this.delay_events.shift();
+
+        if (c.flags) flags |= c.flags;
+        else flags |= SCROLLEVT_NATIVE;
+
+        this.fast_consolidation_event.top = c.target.scrollTop;
+        this.fast_consolidation_event.left = c.target.scrollLeft;
+
+        if (flags & SCROLLEVT_MASK) break;
       }
+      this.fast_consolidation_event.flags |= flags;
+      if (this.fast_consolidation_event.flags & SCROLLEVT_MASK)
+        this.fast_consolidation_event.flags |= SCROLLEVT_BARRIER;
 
-
-      this.timestamp = timestamp;
-
-
-
-      if (values.onScroll) {
-        values.onScroll({ top: scrollTop, left: scrollLeft });
-      }
-
-
-      const [head, tail, top] = this.scroll_with_computed(
-                                  scrollTop,
-                                  scrollLeft
-                                );
-
-      const prev_head = this.state.head,
-            prev_tail = this.state.tail,
-            prev_top = this.state.top;
-
-
-      if (this.scoll_snapshot) {
-        this.scoll_snapshot = false;
-
-        if (head === prev_head && tail === prev_tail && top === prev_top) return;
-
-        this.guard_lock = 1;
-
-        log_debug(values);
-
-        this.setState({ top, head, tail }, () => {
-          // use this.scrollTop & scrollLeft as params directly, 
-          // because it wouldn't be changed until this.scoll_snapshot is false,
-          // and you should to know js closure.
-          values.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
-
-          // update to ColumnProps.fixed synchronously
-          const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-          if (l) l.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
-          if (r) r.wrap_inst.current.parentElement.scrollTo(this.scrollLeft, this.scrollTop);
-
-          this.guard_lock = 0;
-        });
-
-        // update to ColumnProps.fixed synchronously
-        const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-        if (l) l.lptr.setState({ top, head, tail });
-        if (r) r.rptr.setState({ top, head, tail });
-      } else {
-        if (head === prev_head && tail === prev_tail && top === prev_top) return;
-
-        this.guard_lock = 1;
-
-        log_debug(values);
-
-        this.scrollLeft = scrollLeft;
-        this.scrollTop = scrollTop;
-        this.setState({ top, head, tail }, () => this.guard_lock = 0);
-
-        // update to ColumnProps.fixed synchronously
-        const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-        if (l) l.lptr.setState({ top, head, tail });
-        if (r) r.rptr.setState({ top, head, tail });
-      }
-
-
-    });
-
+      if (this.fast_consolidation_event.flags !== SCROLLEVT_NULL)
+        requestAnimationFrame(this.update_self);
+    }, 20);
 
   }
 
+  private update_self(timestamp: number) {
+    cancelAnimationFrame(timestamp);
+    this.throttling = 0;
+
+    let scrollTop = this.fast_consolidation_event.top;
+    let scrollLeft = this.fast_consolidation_event.left;
+    let flags = this.fast_consolidation_event.flags;
+
+    if (values.onScroll) {
+      values.onScroll({ top: scrollTop, left: scrollLeft });
+    }
+
+
+    const [head, tail, top] = this.scroll_with_computed(scrollTop);
+
+    const prev_head = this.state.head,
+          prev_tail = this.state.tail,
+          prev_top = this.state.top;
+
+    if (flags & SCROLLEVT_INIT) {
+      log_debug(values);
+      this.guard_lock = 1; // to lock.
+
+      console.assert(scrollTop === 0 && scrollLeft === 0);
+
+      this.setState({ top, head, tail }, () => {
+        this.el_scroll_to(0, 0); // init this vtable by (0, 0).
+        this.guard_lock = 0; // free lock.
+
+        flags &= ~SCROLLEVT_INIT;
+        flags &= ~SCROLLEVT_BARRIER;
+        this.fast_consolidation_event.flags &= flags;
+
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+      });
+      return;
+    }
+
+    if (flags & SCROLLEVT_RECOMPUTE) {
+      if (head === prev_head && tail === prev_tail && top === prev_top) {
+        flags &= ~SCROLLEVT_BARRIER;
+        flags &= ~SCROLLEVT_RECOMPUTE;
+        this.fast_consolidation_event.flags &= flags;
+        
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        return;
+      }
+      log_debug(values);
+      this.guard_lock = 1; // to lock.
+
+      this.setState({ top, head, tail }, () => {
+        this.el_scroll_to(scrollTop, scrollLeft);
+        this.guard_lock = 0; // free lock.
+
+        flags &= ~SCROLLEVT_BARRIER;
+        flags &= ~SCROLLEVT_RECOMPUTE;
+        this.fast_consolidation_event.flags &= flags;
+
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+      });
+      return;
+    }
+
+    if (flags & SCROLLEVT_RESTORETO) {
+      if (head === prev_head && tail === prev_tail && top === prev_top) {
+        flags &= ~SCROLLEVT_BARRIER;
+        flags &= ~SCROLLEVT_RESTORETO;
+        this.fast_consolidation_event.flags &= flags;
+        this.restoring = false;
+
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        return;
+      }
+      log_debug(values);
+      this.guard_lock = 1;
+      this.restoring = true;
+
+
+      this.setState({ top, head, tail }, () => {
+        this.el_scroll_to(scrollTop, scrollLeft);
+        this.guard_lock = 0;
+
+        flags &= ~SCROLLEVT_BARRIER;
+        flags &= ~SCROLLEVT_RESTORETO;
+        this.fast_consolidation_event.flags &= flags;
+
+        this.restoring = false;
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+      });
+
+      // update to ColumnProps.fixed synchronously
+      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+      if (l) l.lptr.setState({ top, head, tail });
+      if (r) r.rptr.setState({ top, head, tail });
+
+      return;
+    } 
+    
+    if (flags & SCROLLEVT_NATIVE) {
+      if (head === prev_head && tail === prev_tail && top === prev_top) {
+        flags &= ~SCROLLEVT_NATIVE;
+        this.fast_consolidation_event.flags &= flags;
+
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        return;
+      }
+      log_debug(values);
+      this.guard_lock = 1;
+
+      this.scrollLeft = scrollLeft;
+      this.scrollTop = scrollTop;
+
+      this.setState({ top, head, tail }, () => {
+        this.guard_lock = 0;
+        flags &= ~SCROLLEVT_NATIVE;
+
+        this.fast_consolidation_event.flags &= flags;
+        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+      });
+
+      // update to ColumnProps.fixed synchronously
+      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+      if (l) l.lptr.setState({ top, head, tail });
+      if (r) r.rptr.setState({ top, head, tail });
+      return;
+    }
+  }
+
   public scroll(param?: { top: number, left: number }): void | { top: number, left: number } {
-    if (this.scoll_snapshot) return;
+
     if (param) {
+      if (this.restoring) return;
+      this.restoring = true;
+
       if (typeof param.top === "number") {
         this.scrollTop = param.top;
       }
       if (typeof param.left === "number") {
         this.scrollLeft = param.left;
       }
-    
-      this.scoll_snapshot = true;
+
       this.forceUpdate();
     } else {
       return { top: this.scrollTop, left: this.scrollLeft };
     }
+  }
+
+  private el_scroll_to(top: number, left: number) {
+    /* use this.scrollTop & scrollLeft as params directly, 
+     * because it wouldn't be changed until this.scoll_snapshot is false,
+     * and you should to know js closure. */
+    values.wrap_inst.current.parentElement.scrollTo(left, top);
+
+    // update to ColumnProps.fixed synchronously
+    const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+    if (l) l.wrap_inst.current.parentElement.scrollTo(left, top);
+    if (r) r.wrap_inst.current.parentElement.scrollTo(left, top);
   }
 
 
