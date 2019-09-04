@@ -27,7 +27,7 @@ interface vt_ctx {
 export
 interface vt_opts extends Object {
   readonly id: number;
-  height?: number; // will using the Table.scroll.y if unset.
+  height?: number; // will use the Table.scroll.y if unset.
   overscanRowCount?: number; // default 5
   reflection?: string[] | string;
 

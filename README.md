@@ -13,8 +13,8 @@
 
   // the param of the func VTComponents
   interface vt_opts extends Object {
-      id: number;
-      height?: number; // will using the Table.scroll.y if unset.
+      readonly id: number;
+      height?: number; // will use the Table.scroll.y if it unset.
       overscanRowCount?: number; // default 5
       reflection?: string[] | string;
       onScroll?: ({ left, top }: {
@@ -50,7 +50,7 @@
 
   // using in the antd table
   <Table
-    scroll={{ y: 500 }} // it's important for use VTComponents!!!
+    scroll={{ y: 500 }} // it's important for using VTComponents!!!
     components={
       VTComponents({
         id: 1000,    /*the id is immutable*/
@@ -62,7 +62,7 @@
   />
   ```
 
-  > Maybe you need to fix your style
+  > Maybe you need to fix your style.
 
   ```less
   ant-table [vt] > table > .ant-table-tbody > tr > td {
@@ -71,8 +71,8 @@
   ```
 
 
-+ Restore last state
-  ```TypeScript React
++ Restoring last state
+  ```TypeScript
   import React, { PureComponent, useEffect } from 'react';
   import { Table } from 'antd';
 
@@ -153,7 +153,7 @@
 
   > Note: the opt `reflection` only support `getVTComponents(1000).table`.
 
-  ```TypeScript React
+  ```TypeScript
   import React from 'react';
   import { Form, Input } from "antd";
 
@@ -202,7 +202,7 @@
   ```
 
 + support column.fixed
-  ```TypeScript React
+  ```TypeScript
 
   const columns = [
     {
