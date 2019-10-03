@@ -167,7 +167,7 @@ function collect_h_tr(idx: number, val: number) {
 /**
  * Batch repainting.
  */
-const paint: Map<number, HTMLTableRowElement> = new Map();
+let paint: Map<number, HTMLTableRowElement> = new Map();
 let next_frame: boolean = false;
 let time = 0;
 
@@ -180,6 +180,7 @@ function en_cache(idx: number, tr: HTMLTableRowElement) {
       collect_h_tr(entry[0], entry[1].offsetHeight);
     }
     next_frame = false;
+    paint = new Map();
   });
 
 }
@@ -381,6 +382,9 @@ class VT extends React.Component<VTProps, {
   private throttling: number;
   private restoring: boolean;
 
+  private cached_height: number;
+  private cached_height_timeout: number;
+
   public constructor(props: VTProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
@@ -446,6 +450,8 @@ class VT extends React.Component<VTProps, {
     this.fast_consolidation_event = { top: 0, left: 0, flags: SCROLLEVT_NULL };
     this.update_self = this.update_self.bind(this);
     this.throttling = 0;
+
+    this.cached_height_timeout = -1;
   }
 
   public render() {
@@ -575,7 +581,23 @@ class VT extends React.Component<VTProps, {
 
   private scroll_with_computed(top: number) {
 
-    const { row_height, row_count, height, possible_hight_per_tr, overscanRowCount } = values;
+    if (this.cached_height_timeout < 0) {
+      this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;    
+    } else {
+      clearTimeout(this.cached_height_timeout);
+    }
+    this.cached_height_timeout = setTimeout(() => {
+      if (values.load_the_trs_once === e_vt_state.RUNNING)
+        this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;
+    }, 1000);
+
+    const {
+      row_height,
+      row_count,
+      height = this.cached_height,
+      possible_hight_per_tr,
+      overscanRowCount
+    } = values;
 
     let overscan = overscanRowCount;
 
