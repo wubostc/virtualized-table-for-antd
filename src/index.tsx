@@ -89,6 +89,10 @@ const SCROLLEVT_MASK       = (0x7); // The mask exclueds native event.
 const SCROLLEVT_BARRIER    = (1<<4); // It only for INIT, RECOMPUTE and RESTORETO.
 
 
+// minimum frame
+// const minframe = 8;
+
+
 class VT_CONTEXT {
 
 // using closure
@@ -121,6 +125,65 @@ function log_debug(val: storeValue & obj) {
   }
 }
 
+
+function collect_h_tr(idx: number, val: number) {
+  if (val === 0) {
+    if (values.debug) {
+      console.error(`[${ID}] the height of the tr can't be 0`);
+    }
+    return;
+  }
+
+  let { computed_h = 0, row_height = [] } = values;
+  
+  if (values.possible_hight_per_tr === -1) {
+    /* only call once */
+    values.possible_hight_per_tr = val;
+  }
+
+
+  if (row_height[idx]) {
+    computed_h += (val - row_height[idx]); // calculate diff
+  } else {
+    computed_h = computed_h - values.possible_hight_per_tr + val; // replace by real value
+  }
+
+  // assignment
+  row_height[idx] = val;
+
+
+  if (values.computed_h !== computed_h && values.load_the_trs_once !== e_vt_state.INIT) {
+    update_wrap_style(values.wrap_inst.current, computed_h);
+
+    // update to ColumnProps.fixed synchronously
+    const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
+    if (l) update_wrap_style(store.get(0 - ID).wrap_inst.current, computed_h);
+    if (r) update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, computed_h);
+  }
+  values.computed_h = computed_h;
+  values.row_height = row_height;
+}
+
+/**
+ * Batch repainting.
+ */
+const paint: Map<number, HTMLTableRowElement> = new Map();
+let next_frame: boolean = false;
+let time = 0;
+
+function en_cache(idx: number, tr: HTMLTableRowElement) {
+  paint.set(idx, tr);
+  if (next_frame) return;
+  next_frame = true;
+  requestAnimationFrame((_time) => {
+    for(let entry of paint) {
+      collect_h_tr(entry[0], entry[1].offsetHeight);
+    }
+    next_frame = false;
+  });
+
+}
+
 class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
@@ -151,9 +214,12 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidMount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
-
-    if (values.load_the_trs_once === e_vt_state.INIT) values.load_the_trs_once = e_vt_state.LOADED;
+    if (values.load_the_trs_once === e_vt_state.INIT) {
+      collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
+      values.load_the_trs_once = e_vt_state.LOADED;
+    } else {
+      en_cache(this.props.children[0]!.props!.index, this.inst.current);
+    }
   }
 
   public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
@@ -163,47 +229,11 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
+    en_cache(this.props.children[0]!.props!.index, this.inst.current);
+
+    // this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
   }
 
-  private collect_h_tr(idx: number, val: number) {
-    if (val === 0) {
-      if (values.debug) {
-        console.error(`[${ID}] the height of the tr can't be 0`);
-      }
-      return;
-    }
-
-    const { computed_h = 0, row_height = [] } = values;
-    
-    let _computed_h = computed_h;
-    if (values.possible_hight_per_tr === -1) {
-      /* only call once */
-      values.possible_hight_per_tr = val;
-    }
-
-
-    if (row_height[idx]) {
-      _computed_h += (val - row_height[idx]); // calculate diff
-    } else {
-      _computed_h = _computed_h - values.possible_hight_per_tr + val; // replace by real value
-    }
-
-    // assignment
-    row_height[idx] = val;
-
-
-    if (values.computed_h !== _computed_h && values.load_the_trs_once !== e_vt_state.INIT) {
-      update_wrap_style(values.wrap_inst.current, _computed_h);
-
-      // update to ColumnProps.fixed synchronously
-      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-      if (l) update_wrap_style(store.get(0 - ID).wrap_inst.current, _computed_h);
-      if (r) update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, _computed_h);
-    }
-    values.computed_h = _computed_h;
-    values.row_height = row_height;
-  }
 }
 
 
@@ -280,9 +310,10 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
     if (values.load_the_trs_once === e_vt_state.INIT) return;
 
-    let { computed_h = 0, re_computed, } = values;
+    let computed_h = values.computed_h || 0;
+    let re_computed = values.re_computed ;
     const row_count = values.row_count;
-    const row_height = values.row_height;
+    const row_height = values.row_height || [];
 
     /* predicted height */
     if (re_computed < 0) {
@@ -594,7 +625,7 @@ class VT extends React.Component<VTProps, {
     if (e) {
       if (e.flags) {
         for (let i = 0; i < de.length; ++i) {
-          // prevent repeat event for 10ms.
+          // prevent repeat event for 8ms.
           if (e.flags & de[i].flags) return;
 
           if (!skip && de[i].flags & SCROLLEVT_MASK) skip = 1;
@@ -639,7 +670,7 @@ class VT extends React.Component<VTProps, {
 
       if (this.fast_consolidation_event.flags !== SCROLLEVT_NULL)
         requestAnimationFrame(this.update_self);
-    }, 20);
+    }, 8);
 
   }
 
