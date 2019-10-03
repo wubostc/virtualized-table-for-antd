@@ -13,6 +13,11 @@ The above copyright notice and this permission notice shall be included in all c
 import * as React from "react";
 import { TableComponents } from "antd/lib/table/interface";
 
+
+const _brower = 1;
+const _node = 2;
+const env = typeof window === 'object' && window instanceof Window ? _brower : _node;
+
 interface obj extends Object {
   [field: string]: any;
 }
@@ -219,8 +224,11 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     this.cnt = 0;
 
     this.VTWrapperRender = null;
-    const p: any = window;
-    p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
+
+    if (env & _brower) {
+      const p: any = window;
+      p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
+    }
 
     this.fixed = e_fixed.UNKNOW;
   }
