@@ -235,6 +235,12 @@ class VTRow extends React.Component<VTRowProps> {
     // this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
   }
 
+  public componentWillUnmount() {
+    // To prevent repainting this index of this row need not to
+    // get the property "offsetHeight" if this func is called.
+    paint.delete(this.props.children[0]!.props!.index);
+  }
+
 }
 
 
