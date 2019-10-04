@@ -34,6 +34,7 @@
     "name": "wubooo",
     "email": "913721086@qq.com"
   },
+  "publishConfig": { "registry": "https://npm.pkg.github.com/" },
   "private": false,
   "license": "MIT",
   "devDependencies": {
