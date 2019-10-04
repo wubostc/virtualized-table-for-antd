@@ -72,7 +72,7 @@
 
 
 + Restoring last state
-  ```TypeScript
+  ```typescript
   import React, { PureComponent, useEffect } from 'react';
   import { Table } from 'antd';
 
@@ -153,7 +153,7 @@
 
   > Note: the opt `reflection` only support `getVTComponents(1000).table`.
 
-  ```TypeScript
+  ```typescript
   import React from 'react';
   import { Form, Input } from "antd";
 
@@ -202,7 +202,7 @@
   ```
 
 + support column.fixed
-  ```TypeScript
+  ```typescript
 
   const columns = [
     {
