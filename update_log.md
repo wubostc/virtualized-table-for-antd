@@ -1,3 +1,6 @@
+## 0.5.5
+  1. improving compatibility.
+
 ## 0.5.4
   1. fix some bugs.
 
