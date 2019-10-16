@@ -18,6 +18,13 @@ const _brower = 1;
 const _node = 2;
 const env = typeof window === 'object' && window instanceof Window ? _brower : _node;
 
+
+if (env & _brower) {
+  if (!Object.hasOwnProperty.call(window, "requestAnimationFrame")) {
+    throw new Error("Please update your brower or use appropriate polyfill!");
+  }
+}
+
 interface obj extends Object {
   [field: string]: any;
 }
@@ -92,21 +99,6 @@ const SCROLLEVT_BARRIER    = (1<<4); // It only for INIT, RECOMPUTE and RESTORET
 // minimum frame
 // const minframe = 8;
 
-
-class VT_CONTEXT {
-
-// using closure
-public static Switch(ID: number) {
-
-const values = store.get(ID);
-
-const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 });
-
-
-type VTRowProps = {
-  children: any[]
-};
-
 function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
   warp.style.height = `${h < 0 ? 0 : h}px`;
   warp.style.maxHeight = `${h < 0 ? 0 : h}px`;
@@ -123,6 +115,72 @@ function log_debug(val: storeValue & obj) {
     if (store.has((1 << 31) + val.id))
       console.debug(`[${val.id}][${ts}] render vt-fixedright`, store.get((1 << 31) + val.id));
   }
+}
+
+
+class VT_CONTEXT {
+
+// using closure
+public static Switch(ID: number) {
+
+const values = store.get(ID);
+
+const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 });
+
+
+type VTRowProps = {
+  children: any[]
+};
+
+
+/**
+ * side-effects.
+ * functions bind the `values`.
+ */
+function predict_height() {
+
+  const possible_hight_per_tr = values.possible_hight_per_tr;
+
+  if (values.load_the_trs_once === e_vt_state.INIT) return;
+
+  let computed_h = values.computed_h || 0;
+  let re_computed = values.re_computed ;
+  const row_count = values.row_count;
+  const row_height = values.row_height || [];
+
+  /* predicted height */
+  if (re_computed < 0) {
+    for (let i = row_count; re_computed < 0; ++i, ++re_computed) {
+      if (!row_height[i]) {
+        row_height[i] = possible_hight_per_tr;
+      }
+      computed_h -= row_height[i];
+    }
+    values.computed_h = computed_h;
+  } else if (re_computed > 0) {
+    for (let i = row_count - 1; re_computed > 0; --i, --re_computed) {
+      if (!row_height[i]) {
+        row_height[i] = possible_hight_per_tr;
+      }
+      computed_h += row_height[i];
+    }
+    values.computed_h = computed_h;
+  }
+
+}
+
+
+function set_tr_cnt(n: number) {
+
+  const row_count = values.row_count || 0;
+  let re_computed; // 0: no need to recalculate, > 0: add, < 0 subtract
+
+  re_computed = n - row_count;
+
+
+  // writeback
+  values.row_count = n;
+  values.re_computed = re_computed;
 }
 
 
@@ -168,21 +226,19 @@ function collect_h_tr(idx: number, val: number) {
  * Batch repainting.
  */
 let paint: Map<number, HTMLTableRowElement> = new Map();
-let next_frame: boolean = false;
-let time = 0;
+let handle: number = -1;
 
-function en_cache(idx: number, tr: HTMLTableRowElement) {
+function batch_repainting(idx: number, tr: HTMLTableRowElement) {
   paint.set(idx, tr);
-  if (next_frame) return;
-  next_frame = true;
-  requestAnimationFrame((_time) => {
-    for(let entry of paint) {
-      collect_h_tr(entry[0], entry[1].offsetHeight);
-    }
-    next_frame = false;
-    paint = new Map();
-  });
 
+  clearTimeout(handle);
+
+  handle = setTimeout(() => {
+    for(let [index, el] of paint) {
+      collect_h_tr(index, el.offsetHeight);
+    }
+    paint = new Map();
+  }, 16);
 }
 
 class VTRow extends React.Component<VTRowProps> {
@@ -219,7 +275,7 @@ class VTRow extends React.Component<VTRowProps> {
       collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
       values.load_the_trs_once = e_vt_state.LOADED;
     } else {
-      en_cache(this.props.children[0]!.props!.index, this.inst.current);
+      batch_repainting(this.props.children[0]!.props!.index, this.inst.current);
     }
   }
 
@@ -230,15 +286,14 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    en_cache(this.props.children[0]!.props!.index, this.inst.current);
-
-    // this.collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
+    batch_repainting(this.props.children[0]!.props!.index, this.inst.current);
   }
 
   public componentWillUnmount() {
     // To prevent repainting this index of this row need not to
-    // get the property "offsetHeight" if this func is called.
-    paint.delete(this.props.children[0]!.props!.index);
+    // get the property "offsetHeight" if this component will unmount.
+    const idx = this.props.children[0]!.props!.index;
+    paint.delete(idx);
   }
 
 }
@@ -280,7 +335,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             if (this.fixed < 0) this.fixed = fixed;
 
             if ((this.cnt !== children.length) && (fixed === e_fixed.NEITHER)) {
-              this.set_tr_cnt(children.length);
+              set_tr_cnt(children.length);
               this.cnt = children.length;
             }
 
@@ -298,63 +353,17 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   public componentDidMount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    this.predict_height();
+    predict_height();
   }
 
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    this.predict_height();
+    predict_height();
   }
 
   public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: any) {
     return true;
-  }
-
-  public predict_height() {
-
-    const possible_hight_per_tr = values.possible_hight_per_tr;
-
-    if (values.load_the_trs_once === e_vt_state.INIT) return;
-
-    let computed_h = values.computed_h || 0;
-    let re_computed = values.re_computed ;
-    const row_count = values.row_count;
-    const row_height = values.row_height || [];
-
-    /* predicted height */
-    if (re_computed < 0) {
-      for (let i = row_count; re_computed < 0; ++i, ++re_computed) {
-        if (!row_height[i]) {
-          row_height[i] = possible_hight_per_tr;
-        }
-        computed_h -= row_height[i];
-      }
-    } else if (re_computed > 0) {
-      for (let i = row_count - 1; re_computed > 0; --i, --re_computed) {
-        if (!row_height[i]) {
-          row_height[i] = possible_hight_per_tr;
-        }
-        computed_h += row_height[i];
-      }
-    }
-
-    values.computed_h = computed_h;
-
-
-  }
-
-  private set_tr_cnt(n: number) {
-
-    const row_count = values.row_count || 0;
-    let re_computed; // 0: no need to recalculate, > 0: add, < 0 subtract
-
-    re_computed = n - row_count;
-
-
-    // writeback
-    values.row_count = n;
-    values.re_computed = re_computed;
   }
 
 }
@@ -376,20 +385,22 @@ class VT extends React.Component<VTProps, {
   private wrap_inst: React.RefObject<HTMLDivElement>;
   private scrollTop: number;
   private scrollLeft: number;
-  private guard_lock: 1 | 0;
   private fixed: e_fixed;
 
 
   private user_context: obj;
 
 
-  private fast_consolidation_event: { top: number, left: number, flags: number };
-  private delay_events: Array<{ target: { scrollTop: number, scrollLeft: number }, flags?: number } & Event>;
-  private throttling: number;
+  private fast_event: { top: number, left: number, flags: number };
+  private event_queue: Array<{ target: { scrollTop: number, scrollLeft: number }, flags?: number } & Event>;
+
   private restoring: boolean;
 
   private cached_height: number;
-  private cached_height_timeout: number;
+  private HNDID_TIMEOUT: number;
+
+  // HandleId of requestAnimationFrame.
+  private HNDID_RAF: number;
 
   public constructor(props: VTProps, context: any) {
     super(props, context);
@@ -450,14 +461,13 @@ class VT extends React.Component<VTProps, {
     }
 
 
-    this.guard_lock = 0;
-
-    this.delay_events = [];
-    this.fast_consolidation_event = { top: 0, left: 0, flags: SCROLLEVT_NULL };
+    this.event_queue = [];
+    this.fast_event = { top: 0, left: 0, flags: SCROLLEVT_NULL };
     this.update_self = this.update_self.bind(this);
-    this.throttling = 0;
 
-    this.cached_height_timeout = -1;
+
+    this.HNDID_TIMEOUT = -1;
+    this.HNDID_RAF = 0;
   }
 
   public render() {
@@ -488,13 +498,13 @@ class VT extends React.Component<VTProps, {
         this.wrap_inst.current.setAttribute("vt-left", `[${ID}]`);
         store.get(0 - ID).wrap_inst = this.wrap_inst;
         update_wrap_style(this.wrap_inst.current, values.computed_h);
-        break;
+        return;
 
       case e_fixed.R:
         this.wrap_inst.current.setAttribute("vt-right", `[${ID}]`);
         store.get((1 << 31) + ID).wrap_inst = this.wrap_inst;
         update_wrap_style(this.wrap_inst.current, values.computed_h);
-        break;
+        return;
 
       default:
         this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
@@ -510,7 +520,7 @@ class VT extends React.Component<VTProps, {
       values.load_the_trs_once = e_vt_state.RUNNING;
 
       // simulate a event scroll once
-      if (this.fast_consolidation_event.flags & SCROLLEVT_RESTORETO) {
+      if (this.fast_event.flags & SCROLLEVT_RESTORETO) {
         this.scrollHook({
           target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
           flags: SCROLLEVT_INIT & SCROLLEVT_RESTORETO,
@@ -587,12 +597,12 @@ class VT extends React.Component<VTProps, {
 
   private scroll_with_computed(top: number) {
 
-    if (this.cached_height_timeout < 0) {
+    if (this.HNDID_TIMEOUT < 0) {
       this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;    
     } else {
-      clearTimeout(this.cached_height_timeout);
+      clearTimeout(this.HNDID_TIMEOUT);
     }
-    this.cached_height_timeout = setTimeout(() => {
+    this.HNDID_TIMEOUT = setTimeout(() => {
       if (values.load_the_trs_once === e_vt_state.RUNNING)
         this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;
     }, 1000);
@@ -607,7 +617,6 @@ class VT extends React.Component<VTProps, {
 
     let overscan = overscanRowCount;
 
-    const offsetHeight = this.wrap_inst.current.parentElement.offsetHeight;
 
     let accumulate_top = 0, i = 0;
     for (; i < row_count; ++i) {
@@ -625,7 +634,7 @@ class VT extends React.Component<VTProps, {
 
     let torender_h = 0, j = i;
     for (; j < row_count; ++j) {
-      if (torender_h > (height || offsetHeight)) break;
+      if (torender_h > height) break;
       torender_h += (row_height[j] || possible_hight_per_tr);
     }
 
@@ -648,67 +657,63 @@ class VT extends React.Component<VTProps, {
 
 
   private scrollHook(e: any) {
-    let skip = 0;
-    const de = this.delay_events;
-    if (e) {
-      if (e.flags) {
-        for (let i = 0; i < de.length; ++i) {
-          // prevent repeat event for 8ms.
-          if (e.flags & de[i].flags) return;
-
-          if (!skip && de[i].flags & SCROLLEVT_MASK) skip = 1;
-        }
-      }
-      de.push(e);
-      if (skip) return;
+    if (e && values.debug) {
+      console.debug(
+        `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
+        e.target.scrollTop,
+        e.target.scrollLeft);
     }
 
-    if (e && values.debug)
-    console.debug(
-      `[${values.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
-      e.target.scrollTop,
-      e.target.scrollLeft);
 
-    if (this.throttling === 1) return;
+    let skip = 0;
+    const evtq = this.event_queue;
+    if (e) {
+      if (e.flags) {
+        for (let i = 0; i < evtq.length; ++i) {
+          if (e.flags & evtq[i].flags) return;
 
-    if (this.guard_lock === 1) return;
+          if (!skip && evtq[i].flags & SCROLLEVT_MASK) {
+            skip = 1;
+            evtq.push(e);
+            return;
+          }
+        }
+      }
+      evtq.push(e);
+    }
 
-    if (de.length === 0) return;
-
-    this.throttling = 1;
-
-    setTimeout(() => {
 
       let flags = SCROLLEVT_NULL;
-      let cd = this.delay_events.length;
+      let cd = this.event_queue.length;
+
       while(cd--) {
-        const c = this.delay_events.shift();
-
-        if (c.flags) flags |= c.flags;
-        else flags |= SCROLLEVT_NATIVE;
-
-        this.fast_consolidation_event.top = c.target.scrollTop;
-        this.fast_consolidation_event.left = c.target.scrollLeft;
-
+        const evt = this.event_queue.shift();
+  
+        evt.flags ? flags |= evt.flags : flags |= SCROLLEVT_NATIVE;
+  
+        this.fast_event.top = evt.target.scrollTop;
+        this.fast_event.left = evt.target.scrollLeft;
+  
+        // break this loop if evt is not native event.
         if (flags & SCROLLEVT_MASK) break;
       }
-      this.fast_consolidation_event.flags |= flags;
-      if (this.fast_consolidation_event.flags & SCROLLEVT_MASK)
-        this.fast_consolidation_event.flags |= SCROLLEVT_BARRIER;
 
-      if (this.fast_consolidation_event.flags !== SCROLLEVT_NULL)
-        requestAnimationFrame(this.update_self);
-    }, 8);
+      this.fast_event.flags |= flags;
+      if (this.fast_event.flags & SCROLLEVT_MASK)
+        this.fast_event.flags |= SCROLLEVT_BARRIER;
+
+      if (this.fast_event.flags !== SCROLLEVT_NULL) {
+        if (this.HNDID_RAF) cancelAnimationFrame(this.HNDID_RAF);
+        // requestAnimationFrame, ie >= 10
+        this.HNDID_RAF = requestAnimationFrame(this.update_self);
+      }
 
   }
 
   private update_self(timestamp: number) {
-    cancelAnimationFrame(timestamp);
-    this.throttling = 0;
-
-    let scrollTop = this.fast_consolidation_event.top;
-    let scrollLeft = this.fast_consolidation_event.left;
-    let flags = this.fast_consolidation_event.flags;
+    let scrollTop = this.fast_event.top;
+    let scrollLeft = this.fast_event.left;
+    let flags = this.fast_event.flags;
 
     if (values.onScroll) {
       values.onScroll({ top: scrollTop, left: scrollLeft });
@@ -723,19 +728,18 @@ class VT extends React.Component<VTProps, {
 
     if (flags & SCROLLEVT_INIT) {
       log_debug(values);
-      this.guard_lock = 1; // to lock.
 
       console.assert(scrollTop === 0 && scrollLeft === 0);
 
       this.setState({ top, head, tail }, () => {
         this.el_scroll_to(0, 0); // init this vtable by (0, 0).
-        this.guard_lock = 0; // free lock.
+        this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_INIT;
         flags &= ~SCROLLEVT_BARRIER;
-        this.fast_consolidation_event.flags &= flags;
+        this.fast_event.flags &= flags;
 
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
 
       // update to ColumnProps.fixed synchronously
@@ -747,54 +751,57 @@ class VT extends React.Component<VTProps, {
 
     if (flags & SCROLLEVT_RECOMPUTE) {
       if (head === prev_head && tail === prev_tail && top === prev_top) {
+        this.HNDID_RAF = 0;
+
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RECOMPUTE;
-        this.fast_consolidation_event.flags &= flags;
+        this.fast_event.flags &= flags;
         
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        if (this.event_queue.length) this.scrollHook(null); // consume the next.
         return;
       }
       log_debug(values);
-      this.guard_lock = 1; // to lock.
 
       this.setState({ top, head, tail }, () => {
         this.el_scroll_to(scrollTop, scrollLeft);
-        this.guard_lock = 0; // free lock.
+        this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RECOMPUTE;
-        this.fast_consolidation_event.flags &= flags;
+        this.fast_event.flags &= flags;
 
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
       return;
     }
 
     if (flags & SCROLLEVT_RESTORETO) {
       if (head === prev_head && tail === prev_tail && top === prev_top) {
+        this.HNDID_RAF = 0;
+
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RESTORETO;
-        this.fast_consolidation_event.flags &= flags;
+        this.fast_event.flags &= flags;
         this.restoring = false;
 
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        if (this.event_queue.length) this.scrollHook(null); // consume the next.
         return;
       }
       log_debug(values);
-      this.guard_lock = 1;
+
       this.restoring = true;
 
 
       this.setState({ top, head, tail }, () => {
         this.el_scroll_to(scrollTop, scrollLeft);
-        this.guard_lock = 0;
+        this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RESTORETO;
-        this.fast_consolidation_event.flags &= flags;
+        this.fast_event.flags &= flags;
 
         this.restoring = false;
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
 
       // update to ColumnProps.fixed synchronously
@@ -807,24 +814,33 @@ class VT extends React.Component<VTProps, {
     
     if (flags & SCROLLEVT_NATIVE) {
       if (head === prev_head && tail === prev_tail && top === prev_top) {
-        flags &= ~SCROLLEVT_NATIVE;
-        this.fast_consolidation_event.flags &= flags;
+        this.HNDID_RAF = 0;
 
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        flags &= ~SCROLLEVT_NATIVE;
+        this.fast_event.flags &= flags;
+
+        if (this.event_queue.length) {
+          setTimeout(() => {
+            this.scrollHook(null); // consume the next.
+          }, 0);
+        }
         return;
       }
       log_debug(values);
-      this.guard_lock = 1;
 
       this.scrollLeft = scrollLeft;
       this.scrollTop = scrollTop;
 
       this.setState({ top, head, tail }, () => {
-        this.guard_lock = 0;
+        this.HNDID_RAF = 0;
         flags &= ~SCROLLEVT_NATIVE;
 
-        this.fast_consolidation_event.flags &= flags;
-        if (this.delay_events.length) this.scrollHook(null); // comsumer the next.
+        this.fast_event.flags &= flags;
+        if (this.event_queue.length) {
+          setTimeout(() => {
+            this.scrollHook(null); // consume the next.
+          }, 0);
+        }
       });
 
       // update to ColumnProps.fixed synchronously
@@ -912,7 +928,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   const inside = init(vt_opts.id);
 
 
-  Object.assign(inside, { overscanRowCount: 5 }, vt_opts);
+  Object.assign(inside, { overscanRowCount: 5, debug: false, }, vt_opts);
 
   if (vt_opts.debug) {
     console.debug(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
