@@ -874,12 +874,23 @@ class VT extends React.Component<VTProps, {
     /* use this.scrollTop & scrollLeft as params directly, 
      * because it wouldn't be changed until this.scoll_snapshot is false,
      * and you should to know js closure. */
-    values.wrap_inst.current.parentElement.scrollTo(left, top);
+    let el = values.wrap_inst.current.parentElement;
+    /** ie */
+    el.scrollTop = top;
+    el.scrollLeft = left;
 
     // update to ColumnProps.fixed synchronously
     const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-    if (l) l.wrap_inst.current.parentElement.scrollTo(left, top);
-    if (r) r.wrap_inst.current.parentElement.scrollTo(left, top);
+    if (l) {
+      el = l.wrap_inst.current.parentElement;
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    }
+    if (r) {
+      el = r.wrap_inst.current.parentElement;
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    }
   }
 
 
