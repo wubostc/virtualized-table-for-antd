@@ -20,9 +20,8 @@ const env = typeof window === 'object' && window instanceof Window ? _brower : _
 
 
 if (env & _brower) {
-  if (!Object.hasOwnProperty.call(window, "requestAnimationFrame")) {
-    throw new Error("Please update your brower or use appropriate polyfill!");
-  }
+  let f: boolean = Object.hasOwnProperty.call(window, "requestAnimationFrame");
+  if (!f) throw new Error("Please using the modern browers or appropriate polyfill!");
 }
 
 interface obj extends Object {
@@ -53,7 +52,7 @@ enum e_vt_state {
   INIT,
   LOADED,
   RUNNING,
-  CACHE
+  SUSPENDED
 }
 
 enum e_fixed {
@@ -78,7 +77,8 @@ interface storeValue extends vt_opts {
   wrap_inst: React.RefObject<HTMLDivElement>;
   context: React.Context<vt_ctx>;
 
-  VTScroll?: (param?: { top: number, left: number }) => void | { top: number, left: number };
+  // return the last state.
+  VTScroll?: (param?: { top: number, left: number }) => { top: number, left: number };
   VTRefresh?: () => void;
 
   lptr: any; // pointer to VT
@@ -105,15 +105,15 @@ function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
   // if (w) warp.style.width = `${w}px`;
 }
 
-function log_debug(val: storeValue & obj) {
+function log_debug(msg: string, val: storeValue & obj) {
   if (val.debug) {
     val = { ...val };
     const ts = new Date().getTime();
-    console.debug(`[${val.id}][${ts}] render vt`, val);
+    console.debug(`[${ts}][${val.id}][${msg}] render vt`, val);
     if (store.has(0 - val.id))
-      console.debug(`[${val.id}][${ts}] render vt-fixedleft`, store.get(0 - val.id));
+      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedleft`, store.get(0 - val.id));
     if (store.has((1 << 31) + val.id))
-      console.debug(`[${val.id}][${ts}] render vt-fixedright`, store.get((1 << 31) + val.id));
+      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedright`, store.get((1 << 31) + val.id));
   }
 }
 
@@ -370,6 +370,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
 
 
+type SimEvent = { target: { scrollTop: number, scrollLeft: number }, flags: number };
+
 type VTProps = {
   children: any[];
   style: React.CSSProperties;
@@ -391,8 +393,9 @@ class VT extends React.Component<VTProps, {
   private user_context: obj;
 
 
-  private fast_event: { top: number, left: number, flags: number };
-  private event_queue: Array<{ target: { scrollTop: number, scrollLeft: number }, flags?: number } & Event>;
+  private event_queue: Array<SimEvent>;
+  // the Native EVENT of the scrolling.
+  private nevent_queue: Array<Event>;
 
   private restoring: boolean;
 
@@ -434,7 +437,7 @@ class VT extends React.Component<VTProps, {
 
 
 
-      if (values.load_the_trs_once !== e_vt_state.CACHE) {
+      if (values.load_the_trs_once !== e_vt_state.SUSPENDED) {
         values.possible_hight_per_tr = -1;
         values.computed_h = 0;
         values.re_computed = 0;
@@ -462,7 +465,7 @@ class VT extends React.Component<VTProps, {
 
 
     this.event_queue = [];
-    this.fast_event = { top: 0, left: 0, flags: SCROLLEVT_NULL };
+    this.nevent_queue = [];
     this.update_self = this.update_self.bind(this);
 
 
@@ -515,22 +518,27 @@ class VT extends React.Component<VTProps, {
         break;
     }
 
+    // 0 - head, 2 - body
     if (this.props.children[2].props.children.length) {
       // set state of vt on didMount if it has children.
       values.load_the_trs_once = e_vt_state.RUNNING;
 
-      // simulate a event scroll once
-      if (this.fast_event.flags & SCROLLEVT_RESTORETO) {
-        this.scrollHook({
-          target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
-          flags: SCROLLEVT_INIT & SCROLLEVT_RESTORETO,
-        });
-      } else {
-        this.scrollHook({
-          target: { scrollTop: 0, scrollLeft: 0 },
-          flags: SCROLLEVT_INIT,
-        });
-      }
+      this.scrollHook({
+        target: { scrollTop: 0, scrollLeft: 0 },
+        flags: SCROLLEVT_INIT,
+      });
+      // // simulate a event scroll once
+      // if (this.fast_event.flags & SCROLLEVT_RESTORETO) {
+      //   this.scrollHook({
+      //     target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
+      //     flags: SCROLLEVT_INIT & SCROLLEVT_RESTORETO,
+      //   });
+      // } else {
+      //   this.scrollHook({
+      //     target: { scrollTop: 0, scrollLeft: 0 },
+      //     flags: SCROLLEVT_INIT,
+      //   });
+      // }
     }
 
   }
@@ -580,13 +588,14 @@ class VT extends React.Component<VTProps, {
   }
 
   public componentWillUnmount() {
-    // store.delete(this.id);
+    if (this.fixed !== e_fixed.NEITHER) return;
+
     if (values.destory) {
       store.delete(ID);
       store.delete(0 - ID);        // fixed left
       store.delete((1 << 31) + ID);// fixed right
     } else {
-      values.load_the_trs_once = e_vt_state.CACHE;
+      values.load_the_trs_once = e_vt_state.SUSPENDED;
     }
     this.setState = (...args) => null;
   }
@@ -664,62 +673,56 @@ class VT extends React.Component<VTProps, {
         e.target.scrollLeft);
     }
 
-
-    let skip = 0;
-    const evtq = this.event_queue;
     if (e) {
       if (e.flags) {
-        for (let i = 0; i < evtq.length; ++i) {
-          if (e.flags & evtq[i].flags) return;
-
-          if (!skip && evtq[i].flags & SCROLLEVT_MASK) {
-            skip = 1;
-            evtq.push(e);
-            return;
-          }
-        }
+        this.event_queue.push(e);
+      } else {
+        this.nevent_queue.push(e);
       }
-      evtq.push(e);
     }
 
-
-      let flags = SCROLLEVT_NULL;
-      let cd = this.event_queue.length;
-
-      while(cd--) {
-        const evt = this.event_queue.shift();
-  
-        evt.flags ? flags |= evt.flags : flags |= SCROLLEVT_NATIVE;
-  
-        this.fast_event.top = evt.target.scrollTop;
-        this.fast_event.left = evt.target.scrollLeft;
-  
-        // break this loop if evt is not native event.
-        if (flags & SCROLLEVT_MASK) break;
-      }
-
-      this.fast_event.flags |= flags;
-      if (this.fast_event.flags & SCROLLEVT_MASK)
-        this.fast_event.flags |= SCROLLEVT_BARRIER;
-
-      if (this.fast_event.flags !== SCROLLEVT_NULL) {
-        if (this.HNDID_RAF) cancelAnimationFrame(this.HNDID_RAF);
-        // requestAnimationFrame, ie >= 10
-        this.HNDID_RAF = requestAnimationFrame(this.update_self);
-      }
-
+    if (this.nevent_queue.length || this.event_queue.length) {
+      if (this.HNDID_RAF) cancelAnimationFrame(this.HNDID_RAF);
+      // requestAnimationFrame, ie >= 10
+      this.HNDID_RAF = requestAnimationFrame(this.update_self);
+    }
   }
 
   private update_self(timestamp: number) {
-    let scrollTop = this.fast_event.top;
-    let scrollLeft = this.fast_event.left;
-    let flags = this.fast_event.flags;
+
+    const nevq = this.nevent_queue,
+          evq  = this.event_queue;
+
+    let e: SimEvent;
+    // consume the `evq` first.
+    if (evq.length) {
+      e = evq.shift();
+    } else if (nevq.length) {
+      // take the last event from the `nevq`.
+      let ne = nevq[nevq.length - 1];
+      e = {
+        target: {
+          scrollTop: (ne.target as any).scrollTop,
+          scrollLeft: (ne.target as any).scrollLeft,
+        },
+        flags: SCROLLEVT_NATIVE
+      };
+      nevq.length = 0;
+    } else {
+      return;
+    }
+
+    if (e.flags & SCROLLEVT_MASK) e.flags |= SCROLLEVT_BARRIER;
+
+    let scrollTop = e.target.scrollTop;
+    let scrollLeft = e.target.scrollLeft;
+    let flags = e.flags;
 
     if (values.onScroll) {
       values.onScroll({ top: scrollTop, left: scrollLeft });
     }
 
-
+    // checks every tr's height, so it may be take some times...
     const [head, tail, top] = this.scroll_with_computed(scrollTop);
 
     const prev_head = this.state.head,
@@ -727,7 +730,7 @@ class VT extends React.Component<VTProps, {
           prev_top = this.state.top;
 
     if (flags & SCROLLEVT_INIT) {
-      log_debug(values);
+      log_debug("init", values);
 
       console.assert(scrollTop === 0 && scrollLeft === 0);
 
@@ -737,7 +740,6 @@ class VT extends React.Component<VTProps, {
 
         flags &= ~SCROLLEVT_INIT;
         flags &= ~SCROLLEVT_BARRIER;
-        this.fast_event.flags &= flags;
 
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
@@ -750,17 +752,17 @@ class VT extends React.Component<VTProps, {
     }
 
     if (flags & SCROLLEVT_RECOMPUTE) {
+      log_debug("recompute", values);
+
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RECOMPUTE;
-        this.fast_event.flags &= flags;
         
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
         return;
       }
-      log_debug(values);
 
       this.setState({ top, head, tail }, () => {
         this.el_scroll_to(scrollTop, scrollLeft);
@@ -768,7 +770,6 @@ class VT extends React.Component<VTProps, {
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RECOMPUTE;
-        this.fast_event.flags &= flags;
 
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
@@ -776,18 +777,18 @@ class VT extends React.Component<VTProps, {
     }
 
     if (flags & SCROLLEVT_RESTORETO) {
+      log_debug("restoreto", values);
+
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RESTORETO;
-        this.fast_event.flags &= flags;
         this.restoring = false;
 
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
         return;
       }
-      log_debug(values);
 
       this.restoring = true;
 
@@ -798,7 +799,6 @@ class VT extends React.Component<VTProps, {
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RESTORETO;
-        this.fast_event.flags &= flags;
 
         this.restoring = false;
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
@@ -813,20 +813,14 @@ class VT extends React.Component<VTProps, {
     } 
     
     if (flags & SCROLLEVT_NATIVE) {
+      log_debug("native", values);
+
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_NATIVE;
-        this.fast_event.flags &= flags;
-
-        if (this.event_queue.length) {
-          setTimeout(() => {
-            this.scrollHook(null); // consume the next.
-          }, 0);
-        }
         return;
       }
-      log_debug(values);
 
       this.scrollLeft = scrollLeft;
       this.scrollTop = scrollTop;
@@ -834,13 +828,6 @@ class VT extends React.Component<VTProps, {
       this.setState({ top, head, tail }, () => {
         this.HNDID_RAF = 0;
         flags &= ~SCROLLEVT_NATIVE;
-
-        this.fast_event.flags &= flags;
-        if (this.event_queue.length) {
-          setTimeout(() => {
-            this.scrollHook(null); // consume the next.
-          }, 0);
-        }
       });
 
       // update to ColumnProps.fixed synchronously
@@ -851,10 +838,20 @@ class VT extends React.Component<VTProps, {
     }
   }
 
-  public scroll(param?: { top: number, left: number }): void | { top: number, left: number } {
+  // returns the last state.
+  public scroll(param?: { top: number, left: number }): { top: number, left: number } {
 
     if (param) {
-      if (this.restoring) return;
+      if (this.restoring) {
+        return {
+          top: this.scrollTop,
+          left: this.scrollLeft,
+        };
+      }
+
+      const lst_top = this.scrollTop;
+      const lst_left = this.scrollLeft;
+
       this.restoring = true;
 
       if (typeof param.top === "number") {
@@ -865,6 +862,11 @@ class VT extends React.Component<VTProps, {
       }
 
       this.forceUpdate();
+
+      return {
+        top: lst_top,
+        left: lst_left,
+      };
     } else {
       return { top: this.scrollTop, left: this.scrollLeft };
     }
@@ -932,9 +934,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 
   if (Object.hasOwnProperty.call(vt_opts, "height")) {
     console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
-  }/* else {
-    console.warn("VTComponents: it will reduce the performance when scrolling if there is no 'height' prop.");
-  }*/
+  }
 
   const inside = init(vt_opts.id);
 
