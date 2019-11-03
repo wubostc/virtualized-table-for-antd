@@ -81,40 +81,183 @@ interface storeValue extends vt_opts {
   VTScroll?: (param?: { top: number, left: number }) => { top: number, left: number };
   VTRefresh?: () => void;
 
-  lptr: any; // pointer to VT
-  rptr: any; // pointer to VT
+  _React_ptr: any; // pointer to the instance of `VT`.
+
+  _lstoreval: storeValue; // fixed left.
+  _rstoreval: storeValue; // fixed right.
+
+
+  WH: number;      // Wrapped Height.
+                   // it's the newest value of `wrap_inst`'s height to update.
+  HND_WH: number;  // a handle that timeout's returns for `warp_height`.
+
+
+  PAINT: Map<number/* index */, HTMLTableRowElement>;
+  HND_PAINT: number;  // a handle for Batch Repainting.
 }
 
 const store: Map<number, storeValue> = new Map();
 
+/**
+ * THE EVENTS OF SCROLLING.
+ */
 const SCROLLEVT_NULL       = (0<<0);
-const SCROLLEVT_INIT       = (1<<0)
+const SCROLLEVT_INIT       = (1<<0);
 const SCROLLEVT_RECOMPUTE  = (1<<1);
 const SCROLLEVT_RESTORETO  = (1<<2);
 const SCROLLEVT_NATIVE     = (1<<3);
 const SCROLLEVT_MASK       = (0x7); // The mask exclueds native event.
 const SCROLLEVT_BARRIER    = (1<<4); // It only for INIT, RECOMPUTE and RESTORETO.
 
+/**
+ * define CONSTANTs.
+ */
+const MIN_FRAME = 16;
 
-// minimum frame
-// const minframe = 8;
 
-function update_wrap_style(warp: HTMLDivElement, h: number, w?: number) {
-  warp.style.height = `${h < 0 ? 0 : h}px`;
-  warp.style.maxHeight = `${h < 0 ? 0 : h}px`;
-  // if (w) warp.style.width = `${w}px`;
+/** update to ColumnProps.fixed synchronously */
+function _RC_fixed_setState(val: storeValue, top: number, head: number, tail: number) {
+  if (val._lstoreval)
+    val._lstoreval._React_ptr.setState({ top, head, tail });
+  if (val._rstoreval)
+    val._rstoreval._React_ptr.setState({ top, head, tail });
 }
 
-function log_debug(msg: string, val: storeValue & obj) {
+
+/**
+ * the following functions bind the `values`.
+ */
+function _Update_wrap_style(val: storeValue, h: number) {
+  val.wrap_inst.current.style.height = `${h}px`;
+  val.wrap_inst.current.style.maxHeight = `${h}px`;
+}
+
+
+/** non-block, just create a macro tack, then only update once. */
+function update_wrap_style(val: storeValue, h: number) {
+  if (val.WH === h) return;
+
+  val.WH = h;
+
+  if (val.HND_WH > 0) return;
+
+  val.HND_WH = setTimeout(() => {
+    const h = val.WH < 0 ? 0 : val.WH;
+    _Update_wrap_style(val, h);
+
+    /* update the `ColumnProps.fixed` synchronously */
+    if (val._lstoreval) _Update_wrap_style(val._lstoreval, h);
+    if (val._rstoreval) _Update_wrap_style(val._rstoreval, h);
+
+    // free this handle.
+    val.HND_WH = 0;
+  }, MIN_FRAME);
+}
+
+
+function add_h_tr(val: storeValue, idx: number, h: number) {
+  console.assert(h >= 0);
+
+  let { computed_h, row_height } = val;
+
+  if (val.possible_hight_per_tr === -1) {
+    /* only call once */
+    val.possible_hight_per_tr = h;
+  }
+
+
+  if (row_height[idx] >= 0) {
+    computed_h += (h - row_height[idx]); // calculate diff
+  } else {
+    row_height[idx] = h;
+    computed_h = computed_h - val.possible_hight_per_tr + h; // replace by real value
+  }
+
+  row_height[idx] = h;
+
+  if (val.computed_h !== computed_h && val.load_the_trs_once !== e_vt_state.INIT) {
+    update_wrap_style(val, computed_h);
+  }
+
+  val.computed_h = computed_h;
+}
+
+
+function free_h_tr(val: storeValue, idx: number) {
+  console.assert(val.row_height[idx] >= 0);
+  val.computed_h -= val.row_height[idx];
+  if (val.computed_h < 0) val.computed_h = 0;
+}
+
+
+/** non-block */
+function batch_repainting(val: storeValue, idx: number, tr: HTMLTableRowElement) {
+  val.PAINT.set(idx, tr);
+
+  if (val.HND_PAINT > 0) return;
+
+  val.HND_PAINT = requestAnimationFrame(() => {
+    for(let [index, el] of val.PAINT) {
+      add_h_tr(val, index, el.offsetHeight);
+    }
+    val.PAINT = new Map();
+    // free this handle manually.
+    val.HND_PAINT = 0;
+  });
+}
+
+
+function log_debug(val: storeValue & obj, msg: string) {
   if (val.debug) {
     val = { ...val };
     const ts = new Date().getTime();
     console.debug(`[${ts}][${val.id}][${msg}] render vt`, val);
-    if (store.has(0 - val.id))
-      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedleft`, store.get(0 - val.id));
-    if (store.has((1 << 31) + val.id))
-      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedright`, store.get((1 << 31) + val.id));
+    if (val._lstoreval)
+      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedleft`, val._lstoreval);
+    if (val._rstoreval)
+      console.debug(`[${ts}][${val.id}][${msg}] render vt-fixedright`, val._rstoreval);
   }
+}
+
+
+function set_predict_height(values: storeValue) {
+
+  const possible_hight_per_tr = values.possible_hight_per_tr;
+
+  if (values.load_the_trs_once === e_vt_state.INIT) return;
+
+  let computed_h = values.computed_h;
+  let re_computed = values.re_computed ;
+  const row_count = values.row_count;
+  const row_height = values.row_height;
+
+  /* predicted height */
+  if (re_computed < 0) {
+    for (let i = row_count; re_computed < 0; ++i, ++re_computed) {
+      computed_h -= row_height[i] >= 0 ? row_height[i] : possible_hight_per_tr;
+    }
+    values.computed_h = computed_h;
+  } else if (re_computed > 0) {
+    for (let i = row_count - 1; re_computed > 0; --i, --re_computed) {
+      computed_h += row_height[i] >= 0 ? row_height[i] : possible_hight_per_tr;
+    }
+    values.computed_h = computed_h;
+  }
+
+}
+
+
+function set_tr_cnt(values: storeValue, n: number) {
+
+  const row_count = values.row_count || 0;
+  let re_computed; // 0: no need to recalculate, > 0: add, < 0 subtract
+
+  re_computed = n - row_count;
+
+
+  // writeback
+  values.row_count = n;
+  values.re_computed = re_computed;
 }
 
 
@@ -131,115 +274,6 @@ const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 });
 type VTRowProps = {
   children: any[]
 };
-
-
-/**
- * side-effects.
- * functions bind the `values`.
- */
-function predict_height() {
-
-  const possible_hight_per_tr = values.possible_hight_per_tr;
-
-  if (values.load_the_trs_once === e_vt_state.INIT) return;
-
-  let computed_h = values.computed_h || 0;
-  let re_computed = values.re_computed ;
-  const row_count = values.row_count;
-  const row_height = values.row_height || [];
-
-  /* predicted height */
-  if (re_computed < 0) {
-    for (let i = row_count; re_computed < 0; ++i, ++re_computed) {
-      if (!row_height[i]) {
-        row_height[i] = possible_hight_per_tr;
-      }
-      computed_h -= row_height[i];
-    }
-    values.computed_h = computed_h;
-  } else if (re_computed > 0) {
-    for (let i = row_count - 1; re_computed > 0; --i, --re_computed) {
-      if (!row_height[i]) {
-        row_height[i] = possible_hight_per_tr;
-      }
-      computed_h += row_height[i];
-    }
-    values.computed_h = computed_h;
-  }
-
-}
-
-
-function set_tr_cnt(n: number) {
-
-  const row_count = values.row_count || 0;
-  let re_computed; // 0: no need to recalculate, > 0: add, < 0 subtract
-
-  re_computed = n - row_count;
-
-
-  // writeback
-  values.row_count = n;
-  values.re_computed = re_computed;
-}
-
-
-function collect_h_tr(idx: number, val: number) {
-  if (val === 0) {
-    if (values.debug) {
-      console.error(`[${ID}] the height of the tr can't be 0`);
-    }
-    return;
-  }
-
-  let { computed_h = 0, row_height = [] } = values;
-  
-  if (values.possible_hight_per_tr === -1) {
-    /* only call once */
-    values.possible_hight_per_tr = val;
-  }
-
-
-  if (row_height[idx]) {
-    computed_h += (val - row_height[idx]); // calculate diff
-  } else {
-    computed_h = computed_h - values.possible_hight_per_tr + val; // replace by real value
-  }
-
-  // assignment
-  row_height[idx] = val;
-
-
-  if (values.computed_h !== computed_h && values.load_the_trs_once !== e_vt_state.INIT) {
-    update_wrap_style(values.wrap_inst.current, computed_h);
-
-    // update to ColumnProps.fixed synchronously
-    const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-    if (l) update_wrap_style(store.get(0 - ID).wrap_inst.current, computed_h);
-    if (r) update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, computed_h);
-  }
-  values.computed_h = computed_h;
-  values.row_height = row_height;
-}
-
-/**
- * Batch repainting.
- */
-let paint: Map<number, HTMLTableRowElement> = new Map();
-let handle: number = -1;
-
-function batch_repainting(idx: number, tr: HTMLTableRowElement) {
-  paint.set(idx, tr);
-
-  clearTimeout(handle);
-
-  handle = setTimeout(() => {
-    for(let [index, el] of paint) {
-      collect_h_tr(index, el.offsetHeight);
-    }
-    paint = new Map();
-  }, 16);
-}
 
 class VTRow extends React.Component<VTRowProps> {
 
@@ -272,10 +306,10 @@ class VTRow extends React.Component<VTRowProps> {
     if (this.fixed !== e_fixed.NEITHER) return;
 
     if (values.load_the_trs_once === e_vt_state.INIT) {
-      collect_h_tr(this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
+      add_h_tr(values, this.props.children[0]!.props!.index, this.inst.current.offsetHeight);
       values.load_the_trs_once = e_vt_state.LOADED;
     } else {
-      batch_repainting(this.props.children[0]!.props!.index, this.inst.current);
+      batch_repainting(values, this.props.children[0]!.props!.index, this.inst.current);
     }
   }
 
@@ -286,14 +320,16 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    batch_repainting(this.props.children[0]!.props!.index, this.inst.current);
+    batch_repainting(values, this.props.children[0]!.props!.index, this.inst.current);
   }
 
   public componentWillUnmount() {
     // To prevent repainting this index of this row need not to
     // get the property "offsetHeight" if this component will unmount.
+    if (this.fixed !== e_fixed.NEITHER || values.PAINT.size === 0) return;
     const idx = this.props.children[0]!.props!.index;
-    paint.delete(idx);
+    free_h_tr(values, idx);
+    values.PAINT.delete(idx);
   }
 
 }
@@ -335,7 +371,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             if (this.fixed < 0) this.fixed = fixed;
 
             if ((this.cnt !== children.length) && (fixed === e_fixed.NEITHER)) {
-              set_tr_cnt(children.length);
+              set_tr_cnt(values, children.length);
               this.cnt = children.length;
             }
 
@@ -353,13 +389,13 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   public componentDidMount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    predict_height();
+    set_predict_height(values);
   }
 
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    predict_height();
+    set_predict_height(values);
   }
 
   public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: any) {
@@ -421,12 +457,13 @@ class VT extends React.Component<VTProps, {
     const fixed = this.props.children[0].props.fixed;
     if (fixed === "left") {
       this.fixed = e_fixed.L;
-      store.set(0 - ID, { lptr: this } as storeValue);
+      store.set(0 - ID, { _React_ptr: this } as storeValue);
     } else if (fixed === "right") {
       this.fixed = e_fixed.R;
-      store.set((1 << 31) + ID, { rptr: this } as storeValue);
+      store.set((1 << 31) + ID, { _React_ptr: this } as storeValue);
     } else {
       this.fixed = e_fixed.NEITHER;
+      values._React_ptr = this; // always set. even if it is `NEITHER`.
     }
 
 
@@ -435,42 +472,41 @@ class VT extends React.Component<VTProps, {
       // hooks event
       this.scrollHook = this.scrollHook.bind(this);
 
-
-
       if (values.load_the_trs_once !== e_vt_state.SUSPENDED) {
         values.possible_hight_per_tr = -1;
         values.computed_h = 0;
         values.re_computed = 0;
+        values.row_height = [];
       }
       values.VTRefresh = this.refresh.bind(this);
       values.VTScroll = this.scroll.bind(this);
       values.load_the_trs_once = e_vt_state.INIT;
+
+      this.user_context = {};
+
+      let reflection = values.reflection || [];
+      if (typeof reflection === "string") {
+        reflection = [reflection];
+      }
+  
+      for (let i = 0; i < reflection.length; ++i) {
+        this.user_context[reflection[i]] = this.props[reflection[i]];
+      }
+  
+      this.event_queue = [];
+      this.nevent_queue = [];
+      this.update_self = this.update_self.bind(this);
+
+      this.HNDID_TIMEOUT = -1;
+      this.HNDID_RAF = 0;
     }
 
 
-    this.user_context = {};
-
-
-
-    let reflection = values.reflection || [];
-    if (typeof reflection === "string") {
-      reflection = [reflection];
-    }
-
-
-
-    for (let i = 0; i < reflection.length; ++i) {
-      this.user_context[reflection[i]] = this.props[reflection[i]];
-    }
-
-
-    this.event_queue = [];
-    this.nevent_queue = [];
-    this.update_self = this.update_self.bind(this);
-
-
-    this.HNDID_TIMEOUT = -1;
-    this.HNDID_RAF = 0;
+    // init store, all of the `L` `R` and `NEITHER`.
+    values.WH = 0;
+    values.HND_WH = 0;
+    values.PAINT = new Map();
+    values.HND_PAINT = 0;
   }
 
   public render() {
@@ -495,63 +531,46 @@ class VT extends React.Component<VTProps, {
   }
 
   public componentDidMount() {
-    
     switch (this.fixed) {
       case e_fixed.L:
+        values._lstoreval = store.get(0 - ID);        // registers the `_lstoreval` at the `values`.
+        values._lstoreval.wrap_inst = this.wrap_inst;
+        _Update_wrap_style(values._lstoreval, values.computed_h);
         this.wrap_inst.current.setAttribute("vt-left", `[${ID}]`);
-        store.get(0 - ID).wrap_inst = this.wrap_inst;
-        update_wrap_style(this.wrap_inst.current, values.computed_h);
         return;
 
       case e_fixed.R:
+        values._rstoreval = store.get((1 << 31) + ID); // registers the `_rstoreval` at the `values`.
+        values._rstoreval.wrap_inst = this.wrap_inst;
+        _Update_wrap_style(values._rstoreval, values.computed_h);
         this.wrap_inst.current.setAttribute("vt-right", `[${ID}]`);
-        store.get((1 << 31) + ID).wrap_inst = this.wrap_inst;
-        update_wrap_style(this.wrap_inst.current, values.computed_h);
         return;
 
       default:
-        this.wrap_inst.current.setAttribute("vt", `[${ID}] vt is works!`);
-        this.wrap_inst.current.parentElement.onscroll = this.scrollHook;
         values.wrap_inst = this.wrap_inst;
-        values.re_computed = 0;
-        update_wrap_style(values.wrap_inst.current, values.computed_h);
+        // values.re_computed = 0;
+        this.wrap_inst.current.parentElement.onscroll = this.scrollHook;        
+        _Update_wrap_style(values, values.computed_h);
+        this.wrap_inst.current.setAttribute("vt", `[${ID}]`);
         break;
     }
 
     // 0 - head, 2 - body
     if (this.props.children[2].props.children.length) {
-      // set state of vt on didMount if it has children.
-      values.load_the_trs_once = e_vt_state.RUNNING;
+      console.assert(values.load_the_trs_once === e_vt_state.LOADED);
 
+      values.load_the_trs_once = e_vt_state.RUNNING;
       this.scrollHook({
         target: { scrollTop: 0, scrollLeft: 0 },
         flags: SCROLLEVT_INIT,
       });
-      // // simulate a event scroll once
-      // if (this.fast_event.flags & SCROLLEVT_RESTORETO) {
-      //   this.scrollHook({
-      //     target: { scrollTop: this.scrollTop, scrollLeft: this.scrollLeft },
-      //     flags: SCROLLEVT_INIT & SCROLLEVT_RESTORETO,
-      //   });
-      // } else {
-      //   this.scrollHook({
-      //     target: { scrollTop: 0, scrollLeft: 0 },
-      //     flags: SCROLLEVT_INIT,
-      //   });
-      // }
     }
 
   }
 
   public componentDidUpdate() {
 
-    if (this.fixed === e_fixed.L) {
-      return update_wrap_style(store.get(0 - ID).wrap_inst.current, values.computed_h);
-    } else if (this.fixed === e_fixed.R) {
-      return update_wrap_style(store.get((1 << 31) + ID).wrap_inst.current, values.computed_h);
-    }
-
-    update_wrap_style(values.wrap_inst.current, values.computed_h);
+    if (this.fixed !== e_fixed.NEITHER) return;
 
     if (values.load_the_trs_once === e_vt_state.INIT) {
       return;
@@ -585,15 +604,17 @@ class VT extends React.Component<VTProps, {
         });
       }
     }
+
+    update_wrap_style(values, values.computed_h);
   }
 
   public componentWillUnmount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
     if (values.destory) {
-      store.delete(ID);
       store.delete(0 - ID);        // fixed left
       store.delete((1 << 31) + ID);// fixed right
+      store.delete(ID);
     } else {
       values.load_the_trs_once = e_vt_state.SUSPENDED;
     }
@@ -730,7 +751,7 @@ class VT extends React.Component<VTProps, {
           prev_top = this.state.top;
 
     if (flags & SCROLLEVT_INIT) {
-      log_debug("init", values);
+      log_debug(values, "SCROLLEVT_INIT");
 
       console.assert(scrollTop === 0 && scrollLeft === 0);
 
@@ -744,15 +765,12 @@ class VT extends React.Component<VTProps, {
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
 
-      // update to ColumnProps.fixed synchronously
-      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-      if (l) l.lptr.setState({ top, head, tail });
-      if (r) r.rptr.setState({ top, head, tail });
+      _RC_fixed_setState(values, top, head, tail);
       return;
     }
 
     if (flags & SCROLLEVT_RECOMPUTE) {
-      log_debug("recompute", values);
+      log_debug(values, "SCROLLEVT_RECOMPUTE");
 
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
@@ -773,11 +791,13 @@ class VT extends React.Component<VTProps, {
 
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
+
+      _RC_fixed_setState(values, top, head, tail);
       return;
     }
 
     if (flags & SCROLLEVT_RESTORETO) {
-      log_debug("restoreto", values);
+      log_debug(values, "SCROLLEVT_RESTORETO");
 
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
@@ -804,16 +824,12 @@ class VT extends React.Component<VTProps, {
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
 
-      // update to ColumnProps.fixed synchronously
-      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-      if (l) l.lptr.setState({ top, head, tail });
-      if (r) r.rptr.setState({ top, head, tail });
-
+      _RC_fixed_setState(values, top, head, tail);
       return;
     } 
     
     if (flags & SCROLLEVT_NATIVE) {
-      log_debug("native", values);
+      log_debug(values, "SCROLLEVT_NATIVE");
 
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
@@ -830,10 +846,7 @@ class VT extends React.Component<VTProps, {
         flags &= ~SCROLLEVT_NATIVE;
       });
 
-      // update to ColumnProps.fixed synchronously
-      const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-      if (l) l.lptr.setState({ top, head, tail });
-      if (r) r.rptr.setState({ top, head, tail });
+      _RC_fixed_setState(values, top, head, tail);
       return;
     }
   }
@@ -873,23 +886,19 @@ class VT extends React.Component<VTProps, {
   }
 
   private el_scroll_to(top: number, left: number) {
-    /* use this.scrollTop & scrollLeft as params directly, 
-     * because it wouldn't be changed until this.scoll_snapshot is false,
-     * and you should to know js closure. */
+
     let el = values.wrap_inst.current.parentElement;
     /** ie */
     el.scrollTop = top;
     el.scrollLeft = left;
 
-    // update to ColumnProps.fixed synchronously
-    const l = store.get(0 - ID), r = store.get((1 << 31) + ID);
-    if (l) {
-      el = l.wrap_inst.current.parentElement;
+    if (values._lstoreval) {
+      el = values._lstoreval.wrap_inst.current.parentElement;
       el.scrollTop = top;
       el.scrollLeft = left;
     }
-    if (r) {
-      el = r.wrap_inst.current.parentElement;
+    if (values._rstoreval) {
+      el = values._rstoreval.wrap_inst.current.parentElement;
       el.scrollTop = top;
       el.scrollLeft = left;
     }
@@ -939,7 +948,14 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   const inside = init(vt_opts.id);
 
 
-  Object.assign(inside, { overscanRowCount: 5, debug: false, }, vt_opts);
+  Object.assign(
+    inside,
+    {
+      overscanRowCount: 5,
+      debug: false,
+      destory: false,
+    } as storeValue,
+    vt_opts);
 
   if (vt_opts.debug) {
     console.debug(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
