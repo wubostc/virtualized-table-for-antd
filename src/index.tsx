@@ -102,6 +102,14 @@ interface storeValue extends vt_opts {
   PAINT_SADD: Map<number/* shadow index */, number/* height */>;
   PAINT_REPLACE: Map<number/* index */, HTMLTableRowElement>;
   PAINT_FREE: Set<number/* index */>;
+
+  /* stores [begin, end], `INIT`: [-1, -1] */
+  PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
+  PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
+
+  _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
+                            * and default is null. */
+  _prev_row_count: number;
 }
 
 const store: Map<number, storeValue> = new Map();
@@ -137,6 +145,39 @@ function _make_evt(ne:　Event): SimEvent {
 /**
  * the following functions bind the `values`.
  */
+/** Shadow Rows. */
+function srs_diff(
+  ctx: storeValue, PSR: number[],
+  begin: number, end: number, prev_begin: number, prev_end: number) {
+
+  const { row_height, possible_hight_per_tr } = ctx;
+
+  if (begin > prev_begin) {
+    for (let i = prev_begin; i < begin; ++i) {
+      free_h_tr(ctx, i);
+    }
+  } else if (begin < prev_begin) {
+    for (let i = begin; i < prev_begin; ++i) {
+      apply_h_with(WAY_ADD, ctx, i, 
+        isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+    }
+  }
+
+  if (end > prev_end) {
+    for (let i = prev_end; i < end; ++i) {
+      apply_h_with(WAY_ADD, ctx, i,
+        isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+    }
+  } else if (end < prev_end) {
+    for (let i = end; i < prev_end; ++i) {
+      free_h_tr(ctx, i);
+    }
+  }
+
+  PSR[0] = begin;
+  PSR[1] = end;
+}
+ 
 /** update to ColumnProps.fixed synchronously */
 function _RC_fixed_setState(val: storeValue, top: number, head: number, tail: number) {
   if (val._lstoreval)
@@ -174,7 +215,7 @@ type WAY = typeof WAY_ADD | typeof WAY_REPLACE;
  * running level: `LOADED` `RUNNING`.
  */
 function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
-  console.assert(h >= 0);
+  console.assert(!isNaN(h) && h >= 0, `failed to apply height with index ${idx}!`);
 
   let { computed_h, row_height } = val;
 
@@ -200,6 +241,7 @@ function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
 
 
 function free_h_tr(val: storeValue, idx: number) {
+  console.assert(!isNaN(val.row_height[idx]), `failed to free this tr[${idx}].`);
   val.computed_h -= val.row_height[idx];
 }
 
@@ -208,13 +250,13 @@ function _repainting(val: storeValue) {
   return requestAnimationFrame(() => {
     const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_REPLACE } = val;
     
-    log_debug(val, "START");
+    log_debug(val, "START-REPAINTING");
 
     if (PAINT_FREE.size) {
       for (let idx of val.PAINT_FREE) {
         free_h_tr(val, idx);
       }
-      console.assert(val.computed_h >= 0);
+      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
       val.PAINT_FREE = new Set();
     }
 
@@ -222,6 +264,7 @@ function _repainting(val: storeValue) {
       for (let [idx, el] of val.PAINT_ADD) {
         apply_h_with(WAY_ADD, val, idx, el.offsetHeight);
       }
+      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
       val.PAINT_ADD = new Map();
     }
 
@@ -229,6 +272,7 @@ function _repainting(val: storeValue) {
       for (let [idx, h] of PAINT_SADD) {
         apply_h_with(WAY_ADD, val, idx, h);
       }
+      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
       val.PAINT_SADD = new Map();
     }
 
@@ -236,16 +280,16 @@ function _repainting(val: storeValue) {
       for (let [idx, el] of val.PAINT_REPLACE) {
         apply_h_with(WAY_REPLACE, val, idx, el.offsetHeight);
       }
+      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
       val.PAINT_REPLACE = new Map();
     }
 
-    if (val.computed_h < 0) val.computed_h = 0;
     update_wrap_style(val, val.computed_h);
 
     // free this handle manually.
     val.HND_PAINT = 0;
 
-    log_debug(val, "END");
+    log_debug(val, "END-REPAINTING");
   });
 }
 
@@ -285,6 +329,20 @@ function repainting_with_free(val: storeValue, idx: number) {
 function log_debug(val: storeValue & obj, msg: string) {
   if (val.debug) {
     val = { ...val };
+    /* overload __DIAGNOSIS__. */
+    Object.defineProperty(val, "__DIAGNOSIS__", {
+      get() {
+        console.log("OoOoOoO DIAGNOSIS OoOoOoO");
+        let total = 0;
+        for (let i = 0; i < val.row_count; ++i) {
+          total += val.row_height[i];
+        }
+        console.log("total height of each tr", total);
+        console.log("OoOoOoOoOoOoOOoOoOoOoOoOo");
+      },
+      configurable: false,
+      enumerable: false,
+    });
     const ts = new Date().getTime();
     console.debug(`%c[${val.id}][${ts}][${msg}] vt`, "color:#a00", val);
     if (val._lstoreval)
@@ -297,34 +355,9 @@ function log_debug(val: storeValue & obj, msg: string) {
 
 function set_tr_cnt(values: storeValue, n: number) {
   values.re_computed = n - values.row_count;
+  values._prev_row_count = values.row_count;
   values.row_count = n;
 }
-
-
-type ShadowRowProps = { idx: number, val: storeValue };
-
-/**
- * a class hepler of `VTRow` for using the life hooks.
- */
-class ShadowRow extends React.PureComponent<ShadowRowProps> {
-  constructor(props: ShadowRowProps) {
-    super(props);
-  }
-  render(): null {
-    return null;
-  }
-  componentDidMount() {
-    const h = this.props.val.row_height[this.props.idx];
-    repainting_with_sadd(
-      this.props.val,
-      this.props.idx,
-      h >= 0 ? h : this.props.val.possible_hight_per_tr);
-  }
-  componentWillUnmount() {
-    repainting_with_free(this.props.val, this.props.idx);
-  }
-}
-
 
 class VT_CONTEXT {
 
@@ -418,13 +451,6 @@ class VTWrapper extends React.Component<VTWrapperProps> {
     super(props, context);
     this.cnt = 0;
 
-    this.VTWrapperRender = null;
-
-    if (env & _brower) {
-      const p: any = window;
-      p["&REACT_DEBUG"] && p[`&REACT_HOOKS${p["&REACT_DEBUG"]}`][15] && (this.VTWrapperRender = (...args) => <tbody {...args[3]}>{args[2]}</tbody>);
-    }
-
     this.fixed = e_fixed.UNKNOW;
   }
 
@@ -437,20 +463,16 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             
             if (this.fixed < 0) this.fixed = fixed;
 
-            if ((this.cnt !== children.length) && (fixed === e_fixed.NEITHER)) {
-              set_tr_cnt(values, children.length);
-              this.cnt = children.length;
-            }
-
-            if (this.VTWrapperRender) {
-              return this.VTWrapperRender(head, tail, children, restProps);
-            }
-
-            let ShadowRows;
             let trs;
             let len = children.length;
 
-            if (len) {
+            if ((this.cnt !== len) && (fixed === e_fixed.NEITHER)) {
+              set_tr_cnt(values, len);
+              this.cnt = len;
+            }
+
+
+            if (len && this.fixed === e_fixed.NEITHER) {
               if (tail > len) {
                 let offset = tail - len;
                 tail -= offset;
@@ -459,32 +481,107 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 if (tail < 0) tail = 0;
               }
 
-              if (values.load_the_trs_once === e_vt_state.RUNNING
-               && this.fixed === e_fixed.NEITHER)
-              {
-                ShadowRows = [];
-                for (let i = 0; i < head; ++i) {
-                  ShadowRows.push(
-                    <ShadowRow key={children[i].key} val={values} idx={i}></ShadowRow>);
+              trs = [];
+              let n2insert = 0, n2delete = 0;
+              len = values.row_count;
+              // let prev_len = values.row_count + -values.re_computed;
+              let prev_len = values.row_height.length;
+
+              if (values.load_the_trs_once === e_vt_state.RUNNING) {
+                if (values._prev_keys === null) {
+                  values._prev_keys = new Set();
+                  for (let i = head; i < tail; ++i) {
+                    let child = children[i];
+                    trs.push(child);
+                    values._prev_keys.add(child.key);
+                  }
+                } else if (len > prev_len) {
+                  /**
+                   *        the current keys of trs's       the previous keys of trs's
+                   * =================================================================
+                   * shadow 10                             +9
+                   *        11                              10
+                   *        12                              11
+                   * -------head----------------------------head----------------------
+                   * render 13                              12
+                   *        14                              13
+                   *        15                              14
+                   *        16                              15
+                   * -------tail----------------------------tail----------------------
+                   * shadow 17                              16
+                   *        18                              17
+                   *                                        18
+                   * =================================================================
+                   * +: a new reocrd that will be inserted.
+                   * NOTE: both of `head` and `tail` won't be changed.
+                   */
+                  let keys = new Set<string>();
+                  for (let i = head; i < tail; ++i) {
+                    let child = children[i];
+                    keys.add(child.key);
+                    if (!values._prev_keys.has(child.key)) {
+                      n2insert++;
+                    }
+                    trs.push(child);
+                  }
+                  values._prev_keys = keys;
+                  values.row_height = new Array(n2insert)
+                                        .fill(0, 0, n2insert).concat(values.row_height);
+                } /* else if (len < prev_len) {
+                  let keys = new Set<string>();
+                  for (let i = head; i < tail; ++i) {
+                    let child = children[i];
+                    keys.add(child.key);
+                    if (!values._prev_keys.has(child.key)) {
+                      n2delete++;
+                    }
+                    trs.push(child);
+                    values._prev_keys = keys;
+                  }
+                } */ else {
+                  values._prev_keys.clear();
+                  for (let i = head; i < tail; ++i) {
+                    let child = children[i];
+                    trs.push(child);
+                    values._prev_keys.add(child.key);
+                  }
                 }
-                for (let i = tail; i < len; ++i) {
-                  ShadowRows.push(
-                    <ShadowRow key={children[i].key} val={values} idx={i}></ShadowRow>);
+              } else/* if (values.load_the_trs_once === e_vt_state.INIT) */{
+                for (let i = head; i < tail; ++i) {
+                  trs.push(children[i]);
                 }
               }
 
-              trs = [];
-              for (let i = head; i < tail; ++i) {
-                trs.push(children[i]);
+              if (values.load_the_trs_once === e_vt_state.RUNNING) {
+                let {
+                  PSRA, PSRB,
+                } = values;
+
+                /* PSR's range: [begin, end) */
+                if (PSRA[0] === -1) {
+                  // init Shadow Rows, just do `apply_h_with`.
+                  srs_diff(values, PSRA, 0, head, 0, 0);
+                } else {
+                  srs_diff(values, PSRA, 0, head, PSRA[0], PSRA[1]);
+                }
+
+                if (PSRB[0] === -1) {
+                  // init Shadow Rows, just do `apply_h_with`.
+                  srs_diff(values, PSRB, tail, len, tail, tail);
+                } else {
+                  if (n2insert > 0) {
+                    /* skip numbers of `n2insert`. */
+                    const offset = len - prev_len - n2insert;
+                    srs_diff(values, PSRB, tail, len, PSRB[0],
+                      PSRB[1] + (offset > 0 ? offset : n2insert));
+                  } else {
+                    srs_diff(values, PSRB, tail, len, PSRB[0], PSRB[1]);
+                  }
+                }
               }
             }
 
-            return (
-              <>
-                <tbody {...restProps}>{trs}</tbody>
-                {ShadowRows}
-              </>
-            );
+            return <tbody {...restProps}>{trs}</tbody>;
           }
         }
       </S.Consumer>
@@ -602,6 +699,12 @@ class VT extends React.Component<VTProps, {
       values.PAINT_REPLACE = new Map();
       values.PAINT_FREE = new Set();
       values.HND_PAINT = 0;
+
+      values.PSRA = [-1, -1];
+      values.PSRB = [-1, -1];
+
+      values._prev_keys = null;
+      values._prev_row_count = 0;
     }
 
   }
