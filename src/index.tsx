@@ -102,6 +102,7 @@ interface storeValue extends vt_opts {
   PAINT_SADD: Map<number/* shadow index */, number/* height */>;
   PAINT_REPLACE: Map<number/* index */, HTMLTableRowElement>;
   PAINT_FREE: Set<number/* index */>;
+  PAINT_SFREE: Set<number/* index */>;
 
   /* stores [begin, end], `INIT`: [-1, -1] */
   PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
@@ -215,7 +216,7 @@ type WAY = typeof WAY_ADD | typeof WAY_REPLACE;
  * running level: `LOADED` `RUNNING`.
  */
 function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
-  console.assert(!isNaN(h) && h >= 0, `failed to apply height with index ${idx}!`);
+  console.assert(!isNaN(h), `failed to apply height with index ${idx}!`);
 
   let { computed_h, row_height } = val;
 
@@ -232,7 +233,11 @@ function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
       computed_h = h; // reset initial value.
     }
   } else /* WAY_REPLACE */ {
-    computed_h = computed_h - row_height[idx] + h;
+    if (row_height[idx] === -1/* -1: freed */) {
+      computed_h += h;
+    } else {
+      computed_h = computed_h - row_height[idx] + h;
+    }
   }
 
   row_height[idx] = h;
@@ -243,29 +248,43 @@ function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
 function free_h_tr(val: storeValue, idx: number) {
   console.assert(!isNaN(val.row_height[idx]), `failed to free this tr[${idx}].`);
   val.computed_h -= val.row_height[idx];
+  // val.row_height[idx] = -1; // freed
 }
 
 
 function _repainting(val: storeValue) {
   return requestAnimationFrame(() => {
-    const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_REPLACE } = val;
+    const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_REPLACE, PAINT_SFREE } = val;
     
     log_debug(val, "START-REPAINTING");
 
     if (PAINT_FREE.size) {
-      for (let idx of val.PAINT_FREE) {
+      for (let idx of PAINT_FREE) {
+        let tr: HTMLTableRowElement;
+        if (PAINT_REPLACE.size && (tr = PAINT_REPLACE.get(idx))) {
+          PAINT_ADD.set(idx, tr);
+          PAINT_REPLACE.delete(idx);
+        }
         free_h_tr(val, idx);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
-      val.PAINT_FREE = new Set();
+    }
+
+    if (PAINT_SFREE.size) {
+      for (let idx of PAINT_SFREE) {
+        // prevent repeated free
+        if (!PAINT_FREE.has(idx)) {
+          free_h_tr(val, idx);
+        }
+      }
+      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
     }
 
     if (PAINT_ADD.size) {
-      for (let [idx, el] of val.PAINT_ADD) {
+      for (let [idx, el] of PAINT_ADD) {
         apply_h_with(WAY_ADD, val, idx, el.offsetHeight);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
-      val.PAINT_ADD = new Map();
     }
 
     if (PAINT_SADD.size) {
@@ -273,17 +292,23 @@ function _repainting(val: storeValue) {
         apply_h_with(WAY_ADD, val, idx, h);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
-      val.PAINT_SADD = new Map();
     }
 
     if (PAINT_REPLACE.size) {
-      for (let [idx, el] of val.PAINT_REPLACE) {
+      for (let [idx, el] of PAINT_REPLACE) {
         apply_h_with(WAY_REPLACE, val, idx, el.offsetHeight);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
-      val.PAINT_REPLACE = new Map();
     }
 
+    // clear
+    PAINT_SFREE.clear();
+    PAINT_FREE.clear();
+    PAINT_ADD.clear();
+    PAINT_SADD.clear();
+    PAINT_REPLACE.clear();
+
+    // output to the buffer
     update_wrap_style(val, val.computed_h);
 
     // free this handle manually.
@@ -325,6 +350,12 @@ function repainting_with_free(val: storeValue, idx: number) {
   val.HND_PAINT = _repainting(val);
 }
 
+/** non-block */
+function repainting_with_sfree(val: storeValue, idx: number) {
+  val.PAINT_SFREE.add(idx);
+  if (val.HND_PAINT > 0) return;
+  val.HND_PAINT = _repainting(val);
+}
 
 function log_debug(val: storeValue & obj, msg: string) {
   if (val.debug) {
@@ -337,7 +368,7 @@ function log_debug(val: storeValue & obj, msg: string) {
         for (let i = 0; i < val.row_count; ++i) {
           total += val.row_height[i];
         }
-        console.log("total height of each tr", total);
+        console.log("Verify computed_h", total);
         console.log("OoOoOoOoOoOoOOoOoOoOoOoOo");
       },
       configurable: false,
@@ -418,9 +449,9 @@ class VTRow extends React.Component<VTRowProps> {
     }
   }
 
-  public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
-    return true;
-  }
+  // public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
+  //   return true;
+  // }
 
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
@@ -481,6 +512,10 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 if (tail < 0) tail = 0;
               }
 
+              let {
+                PSRA, PSRB,
+              } = values;
+
               trs = [];
               let n2insert = 0, n2delete = 0;
               len = values.row_count;
@@ -539,12 +574,19 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                     values._prev_keys = keys;
                   }
                 } */ else {
-                  values._prev_keys.clear();
+                  const keys = new Set<string>();
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
+                    if (PSRA[1] === head && PSRB[0] === tail && // no movement occurred
+                        !values._prev_keys.has(child.key))
+                    {
+                      // then, manually free this index befor mounting React Component.
+                      repainting_with_sfree(values, i);
+                    }
                     trs.push(child);
-                    values._prev_keys.add(child.key);
+                    keys.add(child.key);
                   }
+                  values._prev_keys = keys;
                 }
               } else/* if (values.load_the_trs_once === e_vt_state.INIT) */{
                 for (let i = head; i < tail; ++i) {
@@ -553,9 +595,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               }
 
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
-                let {
-                  PSRA, PSRB,
-                } = values;
+
 
                 /* PSR's range: [begin, end) */
                 if (PSRA[0] === -1) {
@@ -698,6 +738,7 @@ class VT extends React.Component<VTProps, {
       values.PAINT_SADD = new Map();
       values.PAINT_REPLACE = new Map();
       values.PAINT_FREE = new Set();
+      values.PAINT_SFREE = new Set();
       values.HND_PAINT = 0;
 
       values.PSRA = [-1, -1];
