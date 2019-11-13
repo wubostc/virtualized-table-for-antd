@@ -108,6 +108,7 @@ interface storeValue extends vt_opts {
   PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
+  _keys2free: Set<string/* key */>;
   _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
                             * and default is null. */
   _prev_row_count: number;
@@ -155,23 +156,29 @@ function srs_diff(
 
   if (begin > prev_begin) {
     for (let i = prev_begin; i < begin; ++i) {
-      free_h_tr(ctx, i);
+      repainting_with_sfree(ctx, i);
+      // free_h_tr(ctx, i);
     }
   } else if (begin < prev_begin) {
     for (let i = begin; i < prev_begin; ++i) {
-      apply_h_with(WAY_ADD, ctx, i, 
+      repainting_with_sadd(ctx, i,
         isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+      // apply_h_with(WAY_ADD, ctx, i, 
+      //   isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
     }
   }
 
   if (end > prev_end) {
     for (let i = prev_end; i < end; ++i) {
-      apply_h_with(WAY_ADD, ctx, i,
+      repainting_with_sadd(ctx, i,
         isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+      // apply_h_with(WAY_ADD, ctx, i,
+      //   isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
     }
   } else if (end < prev_end) {
     for (let i = end; i < prev_end; ++i) {
-      free_h_tr(ctx, i);
+      repainting_with_sfree(ctx, i);
+      // free_h_tr(ctx, i);
     }
   }
 
@@ -220,24 +227,12 @@ function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
 
   let { computed_h, row_height } = val;
 
-  if (val.possible_hight_per_tr === -1) {
-    /* assign only once */
-    val.possible_hight_per_tr = h;
-  }
-
   if (way === WAY_ADD) {
-    if (val.load_the_trs_once === e_vt_state.RUNNING) {
-      computed_h += h; // just do add up.
-    } else {
-      console.assert(val.load_the_trs_once === e_vt_state.LOADED);
-      computed_h = h; // reset initial value.
-    }
+    computed_h += h; // just do add up.
+    console.log("add", idx, h);
   } else /* WAY_REPLACE */ {
-    if (row_height[idx] === -1/* -1: freed */) {
-      computed_h += h;
-    } else {
-      computed_h = computed_h - row_height[idx] + h;
-    }
+    console.log("replace", idx, h);
+    computed_h = computed_h - row_height[idx] + h;
   }
 
   row_height[idx] = h;
@@ -246,6 +241,7 @@ function apply_h_with(way: WAY, val: storeValue, idx: number, h: number) {
 
 
 function free_h_tr(val: storeValue, idx: number) {
+  console.log("free", idx, val.row_height[idx]);
   console.assert(!isNaN(val.row_height[idx]), `failed to free this tr[${idx}].`);
   val.computed_h -= val.row_height[idx];
   // val.row_height[idx] = -1; // freed
@@ -260,11 +256,11 @@ function _repainting(val: storeValue) {
 
     if (PAINT_FREE.size) {
       for (let idx of PAINT_FREE) {
-        let tr: HTMLTableRowElement;
-        if (PAINT_REPLACE.size && (tr = PAINT_REPLACE.get(idx))) {
-          PAINT_ADD.set(idx, tr);
-          PAINT_REPLACE.delete(idx);
-        }
+        // let tr: HTMLTableRowElement;
+        // if (PAINT_REPLACE.size && (tr = PAINT_REPLACE.get(idx))) {
+        //   PAINT_ADD.set(idx, tr);
+        //   PAINT_REPLACE.delete(idx);
+        // }
         free_h_tr(val, idx);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
@@ -273,9 +269,9 @@ function _repainting(val: storeValue) {
     if (PAINT_SFREE.size) {
       for (let idx of PAINT_SFREE) {
         // prevent repeated free
-        if (!PAINT_FREE.has(idx)) {
+        // if (!PAINT_FREE.has(idx)) {
           free_h_tr(val, idx);
-        }
+        // }
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
     }
@@ -357,23 +353,27 @@ function repainting_with_sfree(val: storeValue, idx: number) {
   val.HND_PAINT = _repainting(val);
 }
 
+/* overload __DIAGNOSIS__. */
+function __DIAGNOSIS__(val: storeValue) {
+  Object.defineProperty(val, "__DIAGNOSIS__", {
+    get() {
+      console.log("OoOoOoO DIAGNOSIS OoOoOoO");
+      let total = 0;
+      for (let i = 0; i < val.row_count; ++i) {
+        total += val.row_height[i];
+      }
+      console.log("Verify computed_h", total);
+      console.log("OoOoOoOoOoOoOOoOoOoOoOoOo");
+    },
+    configurable: false,
+    enumerable: false,
+  });
+}
+
 function log_debug(val: storeValue & obj, msg: string) {
   if (val.debug) {
     val = { ...val };
-    /* overload __DIAGNOSIS__. */
-    Object.defineProperty(val, "__DIAGNOSIS__", {
-      get() {
-        console.log("OoOoOoO DIAGNOSIS OoOoOoO");
-        let total = 0;
-        for (let i = 0; i < val.row_count; ++i) {
-          total += val.row_height[i];
-        }
-        console.log("Verify computed_h", total);
-        console.log("OoOoOoOoOoOoOOoOoOoOoOoOo");
-      },
-      configurable: false,
-      enumerable: false,
-    });
+    __DIAGNOSIS__(val);
     const ts = new Date().getTime();
     console.debug(`%c[${val.id}][${ts}][${msg}] vt`, "color:#a00", val);
     if (val._lstoreval)
@@ -386,7 +386,7 @@ function log_debug(val: storeValue & obj, msg: string) {
 
 function set_tr_cnt(values: storeValue, n: number) {
   values.re_computed = n - values.row_count;
-  values._prev_row_count = values.row_count;
+  values._prev_row_count = values._prev_row_count === -1 ? n : values.row_count;
   values.row_count = n;
 }
 
@@ -434,18 +434,25 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidMount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
+    const props: any = this.props;
+    const index = props.children[0]!.props!.index;
+
     if (values.load_the_trs_once === e_vt_state.RUNNING) {
-      repainting_with_add(values,
-        this.props.children[0]!.props!.index,
-        this.inst.current);
+      if (values._keys2free.has(String(props["data-row-key"]))) {
+        repainting_with_free(values, index);
+      }
+      repainting_with_add(values, index, this.inst.current);
     } else {
+      /* init context */
       console.assert(values.load_the_trs_once === e_vt_state.INIT);
       values.load_the_trs_once = e_vt_state.LOADED;
-      apply_h_with(
-        WAY_ADD,
-        values,
-        this.props.children[0]!.props!.index,
-        this.inst.current.offsetHeight);
+      const h = this.inst.current.offsetHeight;
+      if (values.possible_hight_per_tr === -1) {
+        /* assign only once */
+        values.possible_hight_per_tr = h;
+      }
+      values.computed_h = 0; // reset initial value.
+      apply_h_with(WAY_ADD, values, index, h);
     }
   }
 
@@ -455,7 +462,13 @@ class VTRow extends React.Component<VTRowProps> {
 
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
-    repainting_with_replace(values, this.props.children[0]!.props!.index, this.inst.current);
+
+    const index = this.props.children[0]!.props!.index;
+    if (values.PAINT_FREE.size && values.PAINT_FREE.has(index)) {
+      repainting_with_add(values, index, this.inst.current);
+    } else {
+      repainting_with_replace(values, index, this.inst.current);
+    }
   }
 
   public componentWillUnmount() {
@@ -474,7 +487,6 @@ type VTWrapperProps = {
 class VTWrapper extends React.Component<VTWrapperProps> {
 
   private cnt: number;
-  private VTWrapperRender: (...args: any[]) => JSX.Element;
 
   private fixed: e_fixed;
 
@@ -504,23 +516,37 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
 
             if (len && this.fixed === e_fixed.NEITHER) {
+              let offset: number;
               if (tail > len) {
-                let offset = tail - len;
+                offset = tail - len;
                 tail -= offset;
                 head -= offset;
                 if (head < 0) head = 0;
                 if (tail < 0) tail = 0;
+              } else {
+                offset = 0;
               }
 
               let {
                 PSRA, PSRB,
               } = values;
 
+              let fixed_PSRA0 = PSRA[0] - offset,
+                  fixed_PSRA1 = PSRA[1] - offset;
+              if (fixed_PSRA0 < 0) fixed_PSRA0 = 0;
+              if (fixed_PSRA1 < 0) fixed_PSRA1 = 0;
+
+              let fixed_PSRB0 = PSRB[0] - offset,
+                  fixed_PSRB1 = PSRB[1] - offset;
+              if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
+              if (fixed_PSRB1 < 0) fixed_PSRB1 = 0;
+
               trs = [];
               let n2insert = 0, n2delete = 0;
               len = values.row_count;
               // let prev_len = values.row_count + -values.re_computed;
-              let prev_len = values.row_height.length;
+              // let prev_len = values.row_height.length;
+              let prev_len = values._prev_row_count;
 
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
                 if (values._prev_keys === null) {
@@ -530,6 +556,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                     trs.push(child);
                     values._prev_keys.add(child.key);
                   }
+                  values._keys2free = new Set();
                 } else if (len > prev_len) {
                   /**
                    *        the current keys of trs's       the previous keys of trs's
@@ -562,33 +589,36 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   values._prev_keys = keys;
                   values.row_height = new Array(n2insert)
                                         .fill(0, 0, n2insert).concat(values.row_height);
-                } /* else if (len < prev_len) {
-                  let keys = new Set<string>();
-                  for (let i = head; i < tail; ++i) {
-                    let child = children[i];
-                    keys.add(child.key);
-                    if (!values._prev_keys.has(child.key)) {
-                      n2delete++;
-                    }
-                    trs.push(child);
-                    values._prev_keys = keys;
-                  }
-                } */ else {
+                } else if (len < prev_len) {
+
                   const keys = new Set<string>();
+                  values._keys2free = new Set();
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
-                    if (PSRA[1] === head && PSRB[0] === tail && // no movement occurred
+                    if (fixed_PSRA1 === head && fixed_PSRB0 === tail && // no movement occurred
                         !values._prev_keys.has(child.key))
                     {
                       // then, manually free this index befor mounting React Component.
-                      repainting_with_sfree(values, i);
+                      // repainting_with_sfree(values, i);
+                      values._keys2free.add(child.key);
+                      n2delete++;
                     }
                     trs.push(child);
                     keys.add(child.key);
                   }
                   values._prev_keys = keys;
+
+                } else {
+                  const keys = new Set<string>();
+                  for (let i = head; i < tail; ++i) {
+                    let child = children[i];
+                    trs.push(child);
+                    keys.add(child.key);
+                  }
+                  values._prev_keys = keys;
                 }
-              } else/* if (values.load_the_trs_once === e_vt_state.INIT) */{
+              } else {
+                console.assert(values.load_the_trs_once === e_vt_state.INIT)
                 for (let i = head; i < tail; ++i) {
                   trs.push(children[i]);
                 }
@@ -596,20 +626,17 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
 
-
                 /* PSR's range: [begin, end) */
-                if (PSRA[0] === -1) {
-                  // init Shadow Rows, just do `apply_h_with`.
-                  srs_diff(values, PSRA, 0, head, 0, 0);
-                } else {
-                  srs_diff(values, PSRA, 0, head, PSRA[0], PSRA[1]);
-                }
-
                 if (PSRB[0] === -1) {
                   // init Shadow Rows, just do `apply_h_with`.
                   srs_diff(values, PSRB, tail, len, tail, tail);
                 } else {
-                  if (n2insert > 0) {
+                  if (len < prev_len) {
+                    // let n = prev_len - len;
+                    // how many Shadow Rows need to be deleted.
+                    // let SR_n2delete = n - n2delete;
+                    srs_diff(values, PSRB, tail, len, fixed_PSRB0, PSRB[1] - (PSRA[1] - fixed_PSRA1));
+                  } else if (n2insert > 0) {
                     /* skip numbers of `n2insert`. */
                     const offset = len - prev_len - n2insert;
                     srs_diff(values, PSRB, tail, len, PSRB[0],
@@ -618,8 +645,18 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                     srs_diff(values, PSRB, tail, len, PSRB[0], PSRB[1]);
                   }
                 }
+
+                if (PSRA[0] === -1) {
+                  // init Shadow Rows, just do `apply_h_with`.
+                  srs_diff(values, PSRA, 0, head, 0, 0);
+                } else {
+                  srs_diff(values, PSRA, 0, head, PSRA[0], PSRA[1]);
+                }
+
+                values._prev_row_count = values.row_count;
               }
             }
+            console.log("renderrenderrenderrender");
 
             return <tbody {...restProps}>{trs}</tbody>;
           }
@@ -744,8 +781,11 @@ class VT extends React.Component<VTProps, {
       values.PSRA = [-1, -1];
       values.PSRB = [-1, -1];
 
+      values._keys2free = null;
       values._prev_keys = null;
-      values._prev_row_count = 0;
+      values._prev_row_count = -1;
+
+      __DIAGNOSIS__(values);
     }
 
   }
