@@ -109,6 +109,7 @@ interface storeValue extends vt_opts {
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
   _keys2free: Set<string/* key */>;
+  _keys2insert: number/* indexex */;
   _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
                             * and default is null. */
   _prev_row_count: number;
@@ -422,8 +423,8 @@ class VTRow extends React.Component<VTRowProps> {
     const index = props.children[0]!.props!.index;
 
     if (values.load_the_trs_once === e_vt_state.RUNNING) {
-      const str = String(props["data-row-key"]);
-      if (values._keys2free.delete(str)) {
+      const key = String(props["data-row-key"]);
+      if (values._keys2free.delete(key)) {
         repainting_with_free(values, index);
       }
       repainting_with_add(values, index, this.inst.current);
@@ -455,9 +456,16 @@ class VTRow extends React.Component<VTRowProps> {
 
   public componentWillUnmount() {
     if (this.fixed !== e_fixed.NEITHER) return;
-    const index: number = this.props.children[0]!.props!.index;
+    const props: any = this.props;
+    const index: number = props.children[0]!.props!.index;
+    if (values._keys2insert > 0) {
+      values._keys2insert--;
+      // nothing to do... just return.
+      return;
+    }
+
     if (!values.PAINT_SFREE.has(index)) {
-      repainting_with_free(values, this.props.children[0]!.props!.index);
+      repainting_with_free(values, index);
     }
   }
 
@@ -527,7 +535,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               if (fixed_PSRB1 < 0) fixed_PSRB1 = 0;
 
               trs = [];
-              let n2insert = 0, n2delete = 0;
+              let/* n2insert = 0, */n2delete = 0;
               len = values.row_count;
               // let prev_len = values.row_count + -values.re_computed;
               // let prev_len = values.row_height.length;
@@ -535,6 +543,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
                 if (values._prev_keys === null) {
+                  /* init keys */
                   values._prev_keys = new Set();
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
@@ -542,6 +551,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                     values._prev_keys.add(child.key);
                   }
                   values._keys2free = new Set();
+                  values._keys2insert = 0;
                 } else if (len > prev_len) {
                   /**
                    *        the current keys of trs's       the previous keys of trs's
@@ -562,18 +572,22 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                    * +: a new reocrd that will be inserted.
                    * NOTE: both of `head` and `tail` won't be changed.
                    */
+                  console.assert(PSRA[1] === head && PSRB[0] === tail);
                   let keys = new Set<string>();
+                  values._keys2insert = 0;
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
                     keys.add(child.key);
                     if (!values._prev_keys.has(child.key)) {
-                      n2insert++;
+                      values._keys2insert++;
+                      // insert a row at index `i` with height `0`.
+                      values.row_height.splice(i, 0, 0);
                     }
                     trs.push(child);
                   }
+
                   values._prev_keys = keys;
-                  values.row_height = new Array(n2insert)
-                                        .fill(0, 0, n2insert).concat(values.row_height);
+
                 } else if (len < prev_len) {
                   const keys = new Set<string>();
                   values._keys2free.clear();
@@ -615,8 +629,9 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
 
                 n2delete = prev_len - len;
+                // n2insert = len - prev_len;
                 // how many Shadow Rows need to be deleted.
-                let SR_n2delete = 0;
+                let SR_n2delete = 0, SR_n2insert = 0;
 
                 /* PSR's range: [begin, end) */
                 if (PSRB[0] === -1) {
@@ -624,13 +639,13 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   srs_diff(values, PSRB, tail, len, tail, tail);
                 } else {
                   if (len < prev_len) {
+                    /* free some rows */
                     SR_n2delete = n2delete - (PSRB[1] - len);
                     srs_diff(values, PSRB, tail, len, fixed_PSRB0, PSRB[1]);
-                  } else if (n2insert > 0) {
-                    /* skip numbers of `n2insert`. */
-                    const offset = len - prev_len - n2insert;
-                    srs_diff(values, PSRB, tail, len, PSRB[0],
-                      PSRB[1] + (offset > 0 ? offset : n2insert));
+                  } else if (len > prev_len) {
+                    /* insert some rows */
+                    SR_n2insert = values._keys2insert;
+                    srs_diff(values, PSRB, tail, len, PSRB[0], PSRB[1] + SR_n2insert);
                   } else {
                     srs_diff(values, PSRB, tail, len, PSRB[0], PSRB[1]);
                   }
@@ -772,6 +787,7 @@ class VT extends React.Component<VTProps, {
       values.PSRB = [-1, -1];
 
       values._keys2free = null;
+      values._keys2insert = 0;
       values._prev_keys = null;
       values._prev_row_count = -1;
 
