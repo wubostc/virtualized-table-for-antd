@@ -256,11 +256,6 @@ function _repainting(val: storeValue) {
 
     if (PAINT_FREE.size) {
       for (let idx of PAINT_FREE) {
-        // let tr: HTMLTableRowElement;
-        // if (PAINT_REPLACE.size && (tr = PAINT_REPLACE.get(idx))) {
-        //   PAINT_ADD.set(idx, tr);
-        //   PAINT_REPLACE.delete(idx);
-        // }
         free_h_tr(val, idx);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
@@ -268,10 +263,7 @@ function _repainting(val: storeValue) {
 
     if (PAINT_SFREE.size) {
       for (let idx of PAINT_SFREE) {
-        // prevent repeated free
-        // if (!PAINT_FREE.has(idx)) {
-          free_h_tr(val, idx);
-        // }
+        free_h_tr(val, idx);
       }
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
     }
@@ -326,14 +318,6 @@ function repainting_with_add(val: storeValue, idx: number, tr: HTMLTableRowEleme
 /** non-block */
 function repainting_with_sadd(val: storeValue, idx: number, h: number) {
   val.PAINT_SADD.set(idx, h);
-  if (val.HND_PAINT > 0) return;
-  val.HND_PAINT = _repainting(val);
-}
-
-
-/** non-block */
-function repainting_with_replace(val: storeValue, idx: number, tr: HTMLTableRowElement){
-  val.PAINT_REPLACE.set(idx, tr);
   if (val.HND_PAINT > 0) return;
   val.HND_PAINT = _repainting(val);
 }
@@ -438,7 +422,8 @@ class VTRow extends React.Component<VTRowProps> {
     const index = props.children[0]!.props!.index;
 
     if (values.load_the_trs_once === e_vt_state.RUNNING) {
-      if (values._keys2free.has(String(props["data-row-key"]))) {
+      const str = String(props["data-row-key"]);
+      if (values._keys2free.delete(str)) {
         repainting_with_free(values, index);
       }
       repainting_with_add(values, index, this.inst.current);
@@ -456,10 +441,6 @@ class VTRow extends React.Component<VTRowProps> {
     }
   }
 
-  // public shouldComponentUpdate(nextProps: VTRowProps, nextState: any) {
-  //   return true;
-  // }
-
   public componentDidUpdate() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
@@ -467,13 +448,17 @@ class VTRow extends React.Component<VTRowProps> {
     if (values.PAINT_FREE.size && values.PAINT_FREE.has(index)) {
       repainting_with_add(values, index, this.inst.current);
     } else {
-      repainting_with_replace(values, index, this.inst.current);
+      repainting_with_free(values, index);
+      repainting_with_add(values, index, this.inst.current);
     }
   }
 
   public componentWillUnmount() {
     if (this.fixed !== e_fixed.NEITHER) return;
-    repainting_with_free(values, this.props.children[0]!.props!.index);
+    const index: number = this.props.children[0]!.props!.index;
+    if (!values.PAINT_SFREE.has(index)) {
+      repainting_with_free(values, this.props.children[0]!.props!.index);
+    }
   }
 
 }
@@ -590,28 +575,31 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   values.row_height = new Array(n2insert)
                                         .fill(0, 0, n2insert).concat(values.row_height);
                 } else if (len < prev_len) {
-
                   const keys = new Set<string>();
-                  values._keys2free = new Set();
+                  values._keys2free.clear();
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
                     if (fixed_PSRA1 === head && fixed_PSRB0 === tail && // no movement occurred
                         !values._prev_keys.has(child.key))
                     {
                       // then, manually free this index befor mounting React Component.
-                      // repainting_with_sfree(values, i);
                       values._keys2free.add(child.key);
-                      n2delete++;
                     }
                     trs.push(child);
                     keys.add(child.key);
                   }
                   values._prev_keys = keys;
-
                 } else {
                   const keys = new Set<string>();
+                  values._keys2free.clear();
                   for (let i = head; i < tail; ++i) {
                     let child = children[i];
+                    if (fixed_PSRA1 === head && fixed_PSRB0 === tail && // no movement occurred
+                       !values._prev_keys.has(child.key))
+                    {
+                      // then, manually free this index befor mounting React Component.
+                      values._keys2free.add(child.key);
+                    }
                     trs.push(child);
                     keys.add(child.key);
                   }
@@ -626,16 +614,18 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
               if (values.load_the_trs_once === e_vt_state.RUNNING) {
 
+                n2delete = prev_len - len;
+                // how many Shadow Rows need to be deleted.
+                let SR_n2delete = 0;
+
                 /* PSR's range: [begin, end) */
                 if (PSRB[0] === -1) {
                   // init Shadow Rows, just do `apply_h_with`.
                   srs_diff(values, PSRB, tail, len, tail, tail);
                 } else {
                   if (len < prev_len) {
-                    // let n = prev_len - len;
-                    // how many Shadow Rows need to be deleted.
-                    // let SR_n2delete = n - n2delete;
-                    srs_diff(values, PSRB, tail, len, fixed_PSRB0, PSRB[1] - (PSRA[1] - fixed_PSRA1));
+                    SR_n2delete = n2delete - (PSRB[1] - len);
+                    srs_diff(values, PSRB, tail, len, fixed_PSRB0, PSRB[1]);
                   } else if (n2insert > 0) {
                     /* skip numbers of `n2insert`. */
                     const offset = len - prev_len - n2insert;
@@ -650,7 +640,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   // init Shadow Rows, just do `apply_h_with`.
                   srs_diff(values, PSRA, 0, head, 0, 0);
                 } else {
-                  srs_diff(values, PSRA, 0, head, PSRA[0], PSRA[1]);
+                  srs_diff(values, PSRA, 0, head, PSRA[0], fixed_PSRA1 + SR_n2delete);
                 }
 
                 values._prev_row_count = values.row_count;
