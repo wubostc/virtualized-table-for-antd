@@ -1200,10 +1200,6 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
                   Now it depends entirely on \`scroll.y\`.`);
   }
 
-  const { id, overscanRowCount, reflection, onScroll, debug, destroy } = vt_opts;
-
-  vt_opts = { id, overscanRowCount, reflection, onScroll, debug, destroy };
-
   const inside = init(vt_opts.id);
 
 
