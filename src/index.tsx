@@ -38,7 +38,6 @@ interface vt_ctx {
 export
 interface vt_opts extends Object {
   readonly id: number;
-  height?: number; // will use the Table.scroll.y if unset.
   overscanRowCount?: number; // default 5
   reflection?: string[] | string;
 
@@ -68,6 +67,8 @@ enum e_fixed {
 }
 
 interface storeValue extends vt_opts {
+  height: number; // will use the Table.scroll.y if unset.
+
   components: {
     table: React.ReactType,
     wrapper: React.ReactType,
@@ -86,7 +87,6 @@ interface storeValue extends vt_opts {
 
   // return the last state.
   VTScroll?: (param?: { top: number, left: number }) => { top: number, left: number };
-  VTRefresh?: () => void;
 
   _React_ptr: any; // pointer to the instance of `VT`.
 
@@ -670,9 +670,6 @@ class VT extends React.Component<VTProps, {
 
   private restoring: boolean;
 
-  private cached_height: number;
-  private HNDID_TIMEOUT: number;
-
   // HandleId of requestAnimationFrame.
   private HNDID_RAF: number;
 
@@ -712,7 +709,6 @@ class VT extends React.Component<VTProps, {
         ctx.row_height = [];
         ctx.row_count = 0;
       }
-      ctx.VTRefresh = this.refresh.bind(this);
       ctx.VTScroll = this.scroll.bind(this);
       ctx.load_the_trs_once = e_vt_state.INIT;
 
@@ -731,7 +727,6 @@ class VT extends React.Component<VTProps, {
       this.nevent_queue = [];
       this.update_self = this.update_self.bind(this);
 
-      this.HNDID_TIMEOUT = -1;
       this.HNDID_RAF = 0;
     }
 
@@ -880,26 +875,31 @@ class VT extends React.Component<VTProps, {
 
   private scroll_with_computed(top: number) {
 
-    if (this.HNDID_TIMEOUT < 0) {
-      this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;    
-    } else {
-      clearTimeout(this.HNDID_TIMEOUT);
-    }
-    this.HNDID_TIMEOUT = setTimeout(() => {
-      if (ctx.load_the_trs_once === e_vt_state.RUNNING)
-        this.cached_height = this.wrap_inst.current.parentElement.offsetHeight;
-    }, 1000);
-
     const {
       row_height,
       row_count,
-      height = this.cached_height,
+      height,
       possible_hight_per_tr,
       overscanRowCount
     } = ctx;
 
     let overscan = overscanRowCount;
 
+    if (!height) {
+      const props = this.props.children[2].props.children[0].props;
+      try {
+        if (typeof props.scroll.y === "undefined") {
+          console.warn("VT will not works well, did you forget to set `scroll.y`?");
+          ctx.height = this.wrap_inst.current.parentElement.offsetHeight;
+        } else if (typeof props.scroll.y === "number") {
+          ctx.height = props.scroll.y;
+        } else {
+          ctx.height = this.wrap_inst.current.parentElement.offsetHeight;
+        }
+      } catch {
+        console.assert(false);
+      }
+    }
 
     let accumulate_top = 0, i = 0;
     for (; i < row_count; ++i) {
@@ -1196,8 +1196,13 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   ASSERT_ID(vt_opts.id);
 
   if (Object.hasOwnProperty.call(vt_opts, "height")) {
-    console.assert(typeof vt_opts.height === "number" && vt_opts.height >= 0);
+    console.warn(`The property \`vt_opts.height\` has been deprecated.
+                  Now it depends entirely on \`scroll.y\`.`);
   }
+
+  const { id, overscanRowCount, reflection, onScroll, debug, destroy } = vt_opts;
+
+  vt_opts = { id, overscanRowCount, reflection, onScroll, debug, destroy };
 
   const inside = init(vt_opts.id);
 
@@ -1240,11 +1245,4 @@ export
 function VTScroll(id: number, param?: { top: number, left: number }) {
   ASSERT_ID(id);
   return store.get(id).VTScroll(param);
-}
-
-export
-function VTRefresh(id: number) {
-  console.warn('VTRefresh will be deprecated in next release version.');
-  ASSERT_ID(id);
-  store.get(id).VTRefresh();
 }

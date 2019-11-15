@@ -14,7 +14,6 @@
   // the param of the func VTComponents
   interface vt_opts extends Object {
       readonly id: number;
-      height?: number; // will use the Table.scroll.y if it unset.
       overscanRowCount?: number; // default 5
       reflection?: string[] | string;
       onScroll?: ({ left, top }: {
@@ -33,7 +32,6 @@
       wrapper: React.ReactType<any>;
       row: React.ReactType<any>;
   };
-  export declare function VTRefresh(id: number): void; /** @deprecated */
   export declare function VTScroll(id: number, param?: {
       top: number;
       left: number;
@@ -54,7 +52,6 @@
     components={
       VTComponents({
         id: 1000,    /*the id is immutable*/
-        /*height: 500, the height prop is NOT required*/
       })
     }
     columns={/*your columns*/}

@@ -1,3 +1,10 @@
+## 0.6.0
+### this is first stable version, and the main changes are:
+  1. removed `VTRefresh`.
+  1. removed `height`, now it depends entirely on `scroll.y`.
+
+
+
 ## 0.5.5
   1. improving compatibility.
 
