@@ -1,7 +1,10 @@
-
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { Table, Button, Input, Switch, Modal } from 'antd';
-import { VTComponents, VTScroll, } from '../../virtualized-table-for-antd';
+/**
+ * copy this file to your working directory.
+ */
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Table, Button, Input, Switch, Modal, Checkbox } from 'antd';
+import { VTComponents, VTScroll, } from '../src/index';
+import { isNumber } from 'util';
 
 
 function rndstr(str: string) {
@@ -17,7 +20,7 @@ export default function Table1() {
   
   const _data = useMemo(() => {
     const data: any[] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 1000; i++) {
       data.push({
         key: i,
         name: `Edrward ${i}`,
@@ -43,7 +46,6 @@ export default function Table1() {
   const [name, setFullname] = useState("");
   const [age, setAge] = useState<number>();
   const [key, setKey] = useState<string>();
-
 
 
   const showDeleteConfirm = useCallback((record: any, data: any[]) => {
@@ -72,7 +74,8 @@ export default function Table1() {
     record.current = _record;
   }, [setVisibleOfUpdateModal, setText]);
 
-  const columns = useMemo(() => [
+  // Column name age 1 2 3 4 5 6 7 8 operation
+  const _columns = useMemo(() => [
     {
       title: 'Full Name',
       width: 100,
@@ -144,7 +147,19 @@ export default function Table1() {
     },
   ], [data]);
 
+  // columns
+  const [checkedColumns, setCheckedColumns] = useState(["name", "age", "1", "2", "3", "4", "operation"]);
+  const [columns, setColumns] = useState(checkedColumns.map(v => _columns.find(column => column.key === v)));
 
+
+  const [checkedColumnsFixed, setCheckedColumnsFixed] = useState();
+
+
+
+  // VTComponents
+  const [height, setHeight] = useState();
+  const [overscanRowCount, setOverscanRowCount] = useState(5);
+  const [destroy, setDestroy] = useState(false);
 
   return (
     <>
@@ -161,10 +176,6 @@ export default function Table1() {
         }
       }}>{!showPagination ? "show" : "hide"}</Button>
       
-
-      rowSelection:
-      <Switch defaultChecked={showSelection} onChange={(checked) => setSelection(checked)} />
-
 
       <br />
       <br />
@@ -208,7 +219,157 @@ export default function Table1() {
         setAge(null);
       }}>prepend record</button>
 
+      <br />
+      <br />
 
+
+      ----rowSelection----
+      <br />
+      <Switch defaultChecked={showSelection} onChange={(checked) => setSelection(checked)} />
+      <br />
+
+      <button onClick={() => {
+        if (rowKeys.length === 0) return window.alert("no records selected");
+        const _ = data.filter(v => {
+          for (let key of rowKeys) {
+            if (key === v.key) return false;
+          }
+          return true;
+        });
+        setData(_);
+      }}>delete the selected records</button>
+
+      <br />
+      <br />
+
+
+      ----Columns----
+      <br />
+
+      <Checkbox.Group
+        options={[{
+          label: "Full Name (fixed left)",
+          value: "name",
+        },{
+          label: "Age (fixed left)",
+          value: "age",
+        },{
+          label: "column1 (fixed left)",
+          value: "1",
+        },{
+          label: "column2 (fixed left)",
+          value: "2",
+        },{
+          label: "column3 (fixed left)",
+          value: "3",
+        },{
+          label: "column4",
+          value: "4",
+        },{
+          label: "column5",
+          value: "5",
+        },{
+          label: "column6 (fixed right)",
+          value: "6",
+        },{
+          label: "column7 (fixed right)",
+          value: "7",
+        },{
+          label: "column8 (fixed right)",
+          value: "8",
+        },{
+          label: "Action (fixed right)",
+          value: "operation",
+        }]}
+        value={checkedColumnsFixed}
+        onChange={(checkedValue: string[]) => {
+          setCheckedColumnsFixed(checkedValue);
+          const fixed: any = {
+            "name": "left",
+            "age": "left",
+            "1": "left",
+            "2": "left",
+            "3": "left",
+      
+            "6": "right",
+            "7": "right",
+            "8": "right",
+            "operation": "right",
+          };
+          columns.forEach((column) => {
+            const c = checkedValue.find(v => v === column.key);
+            if (c) {
+              (column as any).fixed = fixed[c];
+            } else {
+              try {
+                delete (column as any).fixed;
+              } catch {}
+            }
+          });
+        }}
+      />
+
+      <Checkbox.Group
+        options={[{
+          label: "Full Name",
+          value: "name",
+        },{
+          label: "Age",
+          value: "age",
+        },{
+          label: "column1",
+          value: "1",
+        },{
+          label: "column2",
+          value: "2",
+        },{
+          label: "column3",
+          value: "3",
+        },{
+          label: "column4",
+          value: "4",
+        },{
+          label: "column5",
+          value: "5",
+        },{
+          label: "column6",
+          value: "6",
+        },{
+          label: "column7",
+          value: "7",
+        },{
+          label: "column8",
+          value: "8",
+        },{
+          label: "Action",
+          value: "operation",
+        }]}
+        value={checkedColumns}
+        onChange={(checkedValue: string[]) => {
+          setCheckedColumns(checkedValue);
+          setColumns(checkedColumns.map(v => _columns.find(column => column.key === v)));
+        }}
+      />
+
+
+      <br />
+      <br />
+
+
+      ----VTComponents----
+      <br />
+      height: 
+      <Input style={{ width: 100 }} value={height} onChange={e => {
+        isNumber(+e.target.value) ?
+        setHeight(+e.target.value) : setHeight(void 0);
+      }}></Input><br />
+      overscanRowCount: 
+      <Input style={{ width: 100 }} value={overscanRowCount}
+        onChange={e => {
+          isNumber(+e.target.value) ?
+          setOverscanRowCount(+e.target.value) : setOverscanRowCount(5);
+        }}></Input><br />
+      destroy: <Checkbox checked={destroy} onChange={e => setDestroy(e.target.checked)}></Checkbox> <br />
       <br />
       <br />
       <br />
@@ -218,7 +379,13 @@ export default function Table1() {
         columns={columns}
         dataSource={data}
         scroll={{ y: 500 }}
-        components={VTComponents({ id: 1, debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */})}
+        components={
+          VTComponents(Object.assign({
+            id: 1, debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */
+          },
+          height ? { height } : null,
+          overscanRowCount ? { overscanRowCount } : null))
+        }
         pagination={
           showPagination ?
           {
@@ -234,6 +401,10 @@ export default function Table1() {
               //   setPage(_page);
               //   VTScroll(1, { top: 0, left: 0 });
               // } 
+            },
+            onShowSizeChange(current, size) {
+              setPageSize(size);
+
             }
           } : false
         }
