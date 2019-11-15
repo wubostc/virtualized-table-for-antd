@@ -21,7 +21,7 @@
           top: number;
           left: number;
       }) => void;
-      destory?: boolean; // default false
+      destroy?: boolean; // default false
       debug?: boolean;
   }
 
