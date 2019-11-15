@@ -111,7 +111,7 @@ interface storeValue extends vt_opts {
   _keys2insert: number/* indexex */;
   _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
                             * and default is null. */
-  _prev_row_count: number;
+  prev_row_count: number;
 }
 
 const store: Map<number, storeValue> = new Map();
@@ -341,7 +341,7 @@ function log_debug(ctx: storeValue & obj, msg: string) {
 
 function set_tr_cnt(ctx: storeValue, n: number) {
   ctx.re_computed = n - ctx.row_count;
-  ctx._prev_row_count = ctx._prev_row_count === -1 ? n : ctx.row_count;
+  ctx.prev_row_count = ctx.row_count;
   ctx.row_count = n;
 }
 
@@ -466,7 +466,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             
             if (this.fixed < 0) this.fixed = fixed;
 
-            let trs;
+            let trs = [];
             let len = children.length;
 
             if ((ctx.row_count !== len) && (fixed === e_fixed.NEITHER)) {
@@ -500,24 +500,29 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
               if (fixed_PSRB1 < 0) fixed_PSRB1 = 0;
 
-              trs = [];
-              let/* n2insert = 0, */n2delete = 0;
-              len = ctx.row_count;
+              
 
-              let prev_len = ctx._prev_row_count;
 
-              if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
-                if (ctx._prev_keys === null) {
-                  /* init keys */
-                  ctx._prev_keys = new Set();
-                  for (let i = head; i < tail; ++i) {
-                    let child = children[i];
-                    trs.push(child);
-                    ctx._prev_keys.add(child.key);
-                  }
-                  ctx._keys2free = new Set();
-                  ctx._keys2insert = 0;
-                } else if (len > prev_len) {
+              if (ctx.load_the_trs_once === e_vt_state.INIT) {
+                /* init trs [0, 1] */
+                for (let i = head; i < tail; ++i) {
+                  trs.push(children[i]);
+                }
+                /* init keys */
+                ctx._prev_keys = new Set();
+                ctx._keys2free = new Set();
+                ctx._keys2insert = 0;
+
+                // reset `prev_row_count` as same as `row_count`
+                ctx.prev_row_count = ctx.row_count;
+                ctx.re_computed = 0;
+
+              } else if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+
+                len = ctx.row_count;
+                let prev_len = ctx.prev_row_count;
+
+                if (len > prev_len) {
                   /**
                    *        the current keys of trs's       the previous keys of trs's
                    * =================================================================
@@ -584,17 +589,12 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   }
                   ctx._prev_keys = keys;
                 }
-              } else {
-                console.assert(ctx.load_the_trs_once === e_vt_state.INIT)
-                for (let i = head; i < tail; ++i) {
-                  trs.push(children[i]);
-                }
-              }
 
-              if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
-
-                n2delete = prev_len - len;
-
+                /**
+                 * start srs_diff phase.
+                 * first up, Previous-Shadow-Rows below `trs`,
+                 * then Previous-Shadow-Rows above `trs`.
+                 */
                 // how many Shadow Rows need to be deleted.
                 let SR_n2delete = 0, SR_n2insert = 0;
 
@@ -605,7 +605,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 } else {
                   if (len < prev_len) {
                     /* free some rows */
-                    SR_n2delete = n2delete - (PSRB[1] - len);
+                    SR_n2delete = prev_len - len - (PSRB[1] - len);
                     srs_diff(ctx, PSRB, tail, len, fixed_PSRB0, PSRB[1]);
                   } else if (len > prev_len) {
                     /* insert some rows */
@@ -623,9 +623,10 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   srs_diff(ctx, PSRA, 0, head, PSRA[0], fixed_PSRA1 + SR_n2delete);
                 }
 
-                ctx._prev_row_count = ctx.row_count;
-              }
-            }
+                ctx.prev_row_count = ctx.row_count;
+              } /* RUNNING */
+
+            } /* len && this.fixed === e_fixed.NEITHER */
 
             return <tbody {...restProps}>{trs}</tbody>;
           }
@@ -748,7 +749,7 @@ class VT extends React.Component<VTProps, {
       ctx._keys2free = null;
       ctx._keys2insert = 0;
       ctx._prev_keys = null;
-      ctx._prev_row_count = -1;
+      ctx.prev_row_count = 0;
 
       __DIAGNOSIS__(ctx);
     }
@@ -875,7 +876,7 @@ class VT extends React.Component<VTProps, {
 
   private scroll_with_computed(top: number) {
 
-    const {
+    let {
       row_height,
       row_count,
       height,
@@ -896,6 +897,7 @@ class VT extends React.Component<VTProps, {
         } else {
           ctx.height = this.wrap_inst.current.parentElement.offsetHeight;
         }
+        height = ctx.height;
       } catch {
         console.assert(false);
       }
