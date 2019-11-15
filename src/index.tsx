@@ -100,7 +100,6 @@ interface storeValue extends vt_opts {
   HND_PAINT: number;      // a handle for Batch Repainting.
   PAINT_ADD: Map<number/* index */, HTMLTableRowElement>;
   PAINT_SADD: Map<number/* shadow index */, number/* height */>;
-  PAINT_REPLACE: Map<number/* index */, HTMLTableRowElement>;
   PAINT_FREE: Set<number/* index */>;
   PAINT_SFREE: Set<number/* index */>;
 
@@ -251,7 +250,7 @@ function free_h_tr(val: storeValue, idx: number) {
 
 function _repainting(val: storeValue) {
   return requestAnimationFrame(() => {
-    const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_REPLACE, PAINT_SFREE } = val;
+    const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_SFREE } = val;
     
     log_debug(val, "START-REPAINTING");
 
@@ -283,19 +282,12 @@ function _repainting(val: storeValue) {
       console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
     }
 
-    if (PAINT_REPLACE.size) {
-      for (let [idx, el] of PAINT_REPLACE) {
-        apply_h_with(WAY_REPLACE, val, idx, el.offsetHeight);
-      }
-      console.assert(!isNaN(val.computed_h) && val.computed_h >= 0);
-    }
 
     // clear
     PAINT_SFREE.clear();
     PAINT_FREE.clear();
     PAINT_ADD.clear();
     PAINT_SADD.clear();
-    PAINT_REPLACE.clear();
 
     // output to the buffer
     update_wrap_style(val, val.computed_h);
@@ -778,7 +770,6 @@ class VT extends React.Component<VTProps, {
     if (this.fixed === e_fixed.NEITHER) {
       values.PAINT_ADD = new Map();
       values.PAINT_SADD = new Map();
-      values.PAINT_REPLACE = new Map();
       values.PAINT_FREE = new Set();
       values.PAINT_SFREE = new Set();
       values.HND_PAINT = 0;
