@@ -43,7 +43,7 @@ interface vt_opts extends Object {
   reflection?: string[] | string;
 
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
-  destory?: boolean; // default false
+  destroy?: boolean; // default false
   debug?: boolean;
 }
 
@@ -900,7 +900,7 @@ class VT extends React.Component<VTProps, {
   public componentWillUnmount() {
     if (this.fixed !== e_fixed.NEITHER) return;
 
-    if (values.destory) {
+    if (values.destroy) {
       store.delete(0 - ID);        // fixed left
       store.delete((1 << 31) + ID);// fixed right
       store.delete(ID);
@@ -1243,7 +1243,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
     {
       overscanRowCount: 5,
       debug: false,
-      destory: false,
+      destroy: false,
     } as storeValue,
     vt_opts);
 
