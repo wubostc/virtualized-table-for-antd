@@ -90,8 +90,8 @@ interface storeValue extends vt_opts {
 
   _React_ptr: any; // pointer to the instance of `VT`.
 
-  _lstoreval: storeValue; // fixed left.
-  _rstoreval: storeValue; // fixed right.
+  _lvt_ctx: storeValue; // fixed left.
+  _rvt_ctx: storeValue; // fixed right.
 
 
   WH: number;      // Wrapped Height.
@@ -182,10 +182,10 @@ function srs_diff(
  
 /** update to ColumnProps.fixed synchronously */
 function _RC_fixed_setState(ctx: storeValue, top: number, head: number, tail: number) {
-  if (ctx._lstoreval)
-    ctx._lstoreval._React_ptr.setState({ top, head, tail });
-  if (ctx._rstoreval)
-    ctx._rstoreval._React_ptr.setState({ top, head, tail });
+  if (ctx._lvt_ctx)
+    ctx._lvt_ctx._React_ptr.setState({ top, head, tail });
+  if (ctx._rvt_ctx)
+    ctx._rvt_ctx._React_ptr.setState({ top, head, tail });
 }
 
 
@@ -201,8 +201,24 @@ function update_wrap_style(ctx: storeValue, h: number) {
   ctx.WH = h;
   _Update_wrap_style(ctx, h);
   /* update the `ColumnProps.fixed` synchronously */
-  if (ctx._lstoreval) _Update_wrap_style(ctx._lstoreval, h);
-  if (ctx._rstoreval) _Update_wrap_style(ctx._rstoreval, h);
+  if (ctx._lvt_ctx) _Update_wrap_style(ctx._lvt_ctx, h);
+  if (ctx._rvt_ctx) _Update_wrap_style(ctx._rvt_ctx, h);
+}
+
+
+function _scroll_to(ctx: storeValue, top: number, left: number) {
+  const ele = ctx.wrap_inst.current.parentElement;
+  /** ie */
+  ele.scrollTop = top;
+  ele.scrollLeft = left;
+}
+
+
+function scroll_to(ctx: storeValue, top: number, left: number) {
+  _scroll_to(ctx, top, left);
+
+  if (ctx._lvt_ctx) _scroll_to(ctx._lvt_ctx, top, left);
+  if (ctx._rvt_ctx) _scroll_to(ctx._rvt_ctx, top, left);
 }
 
 
@@ -331,10 +347,10 @@ function log_debug(ctx: storeValue & obj, msg: string) {
     __DIAGNOSIS__(ctx);
     const ts = new Date().getTime();
     console.debug(`%c[${ctx.id}][${ts}][${msg}] vt`, "color:#a00", ctx);
-    if (ctx._lstoreval)
-      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedleft`, "color:#a00", ctx._lstoreval);
-    if (ctx._rstoreval)
-      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedright`, "color:#a00", ctx._rstoreval);
+    if (ctx._lvt_ctx)
+      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedleft`, "color:#a00", ctx._lvt_ctx);
+    if (ctx._rvt_ctx)
+      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedright`, "color:#a00", ctx._rvt_ctx);
   }
 }
 
@@ -449,12 +465,8 @@ type VTWrapperProps = {
 
 class VTWrapper extends React.Component<VTWrapperProps> {
 
-  private fixed: e_fixed;
-
   public constructor(props: VTWrapperProps, context: any) {
     super(props, context);
-
-    this.fixed = e_fixed.UNKNOW;
   }
 
   public render() {
@@ -463,8 +475,6 @@ class VTWrapper extends React.Component<VTWrapperProps> {
       <S.Consumer>
         {
           ({ head, tail, fixed }) => {
-            
-            if (this.fixed < 0) this.fixed = fixed;
 
             let trs = [];
             let len = children.length;
@@ -474,7 +484,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             }
 
 
-            if (len && this.fixed === e_fixed.NEITHER) {
+            if (len && fixed === e_fixed.NEITHER) {
               let offset: number;
               if (tail > len) {
                 offset = tail - len;
@@ -627,6 +637,13 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
             } /* len && this.fixed === e_fixed.NEITHER */
 
+            /* fixed L R */
+            if (len && fixed !== e_fixed.NEITHER) {
+              for (let i = head; i < tail; ++i) {
+                trs.push(children[i]);
+              }
+            }
+
             return <tbody {...restProps}>{trs}</tbody>;
           }
         }
@@ -689,10 +706,8 @@ class VT extends React.Component<VTProps, {
     const fixed = this.props.children[0].props.fixed;
     if (fixed === "left") {
       this.fixed = e_fixed.L;
-      store.set(0 - ID, { _React_ptr: this } as storeValue);
     } else if (fixed === "right") {
       this.fixed = e_fixed.R;
-      store.set((1 << 31) + ID, { _React_ptr: this } as storeValue);
     } else {
       this.fixed = e_fixed.NEITHER;
       ctx._React_ptr = this; // always set. even if it is `NEITHER`.
@@ -779,17 +794,39 @@ class VT extends React.Component<VTProps, {
   public componentDidMount() {
     switch (this.fixed) {
       case e_fixed.L:
-        ctx._lstoreval = store.get(0 - ID);        // registers the `_lstoreval` at the `ctx`.
-        ctx._lstoreval.wrap_inst = this.wrap_inst;
-        _Update_wrap_style(ctx._lstoreval, ctx.computed_h);
-        this.wrap_inst.current.setAttribute("vt-left", `[${ID}]`);
+        {
+          /* registers the `_lvt_ctx` at the `ctx`. */
+          store.set(0 - ID, { _React_ptr: this } as storeValue);
+          ctx._lvt_ctx = store.get(0 - ID);
+          ctx._lvt_ctx.wrap_inst = this.wrap_inst;
+          _Update_wrap_style(ctx._lvt_ctx, ctx.computed_h);
+          const { scrollTop, scrollLeft, state } = ctx._React_ptr;
+          _scroll_to(ctx._lvt_ctx, scrollTop, scrollLeft);
+          ctx._lvt_ctx._React_ptr.setState({
+            top: state.top,
+            head: state.head,
+            tail: state.tail,
+          });
+          this.wrap_inst.current.setAttribute("vt-left", `[${ID}]`);
+        }
         return;
 
       case e_fixed.R:
-        ctx._rstoreval = store.get((1 << 31) + ID); // registers the `_rstoreval` at the `ctx`.
-        ctx._rstoreval.wrap_inst = this.wrap_inst;
-        _Update_wrap_style(ctx._rstoreval, ctx.computed_h);
-        this.wrap_inst.current.setAttribute("vt-right", `[${ID}]`);
+        {
+          /* registers the `_rvt_ctx` at the `ctx`. */
+          store.set((1 << 31) + ID, { _React_ptr: this } as storeValue);
+          ctx._rvt_ctx = store.get((1 << 31) + ID);
+          ctx._rvt_ctx.wrap_inst = this.wrap_inst;
+          _Update_wrap_style(ctx._rvt_ctx, ctx.computed_h);
+          const { scrollTop, scrollLeft, state } = ctx._React_ptr;
+          _scroll_to(ctx._rvt_ctx, scrollTop, scrollLeft);
+          ctx._rvt_ctx._React_ptr.setState({
+            top: state.top,
+            head: state.head,
+            tail: state.tail,
+          });
+          this.wrap_inst.current.setAttribute("vt-right", `[${ID}]`);
+        }
         return;
 
       default:
@@ -1003,7 +1040,7 @@ class VT extends React.Component<VTProps, {
       console.assert(scrollTop === 0 && scrollLeft === 0);
 
       this.setState({ top, head, tail }, () => {
-        this.el_scroll_to(0, 0); // init this vtable by (0, 0).
+        scroll_to(ctx, 0, 0); // init this vtable by (0, 0).
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_INIT;
@@ -1030,7 +1067,7 @@ class VT extends React.Component<VTProps, {
       }
 
       this.setState({ top, head, tail }, () => {
-        this.el_scroll_to(scrollTop, scrollLeft);
+        scroll_to(ctx, scrollTop, scrollLeft);
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
@@ -1061,7 +1098,7 @@ class VT extends React.Component<VTProps, {
 
 
       this.setState({ top, head, tail }, () => {
-        this.el_scroll_to(scrollTop, scrollLeft);
+        scroll_to(ctx, scrollTop, scrollLeft);
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
@@ -1131,26 +1168,6 @@ class VT extends React.Component<VTProps, {
       return { top: this.scrollTop, left: this.scrollLeft };
     }
   }
-
-  private el_scroll_to(top: number, left: number) {
-
-    let el = ctx.wrap_inst.current.parentElement;
-    /** ie */
-    el.scrollTop = top;
-    el.scrollLeft = left;
-
-    if (ctx._lstoreval) {
-      el = ctx._lstoreval.wrap_inst.current.parentElement;
-      el.scrollTop = top;
-      el.scrollLeft = left;
-    }
-    if (ctx._rstoreval) {
-      el = ctx._rstoreval.wrap_inst.current.parentElement;
-      el.scrollTop = top;
-      el.scrollLeft = left;
-    }
-  }
-
 
 
   public static Wrapper = VTWrapper;
