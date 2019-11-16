@@ -515,7 +515,6 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
                 // reset `prev_row_count` as same as `row_count`
                 ctx.prev_row_count = ctx.row_count;
-                ctx.re_computed = 0;
 
               } else if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
 
