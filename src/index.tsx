@@ -931,14 +931,6 @@ class VT extends React.Component<VTProps, {
     return [0 | i, 0 | j, 0 | accumulate_top];
   }
 
-  /**
-   * @deprecated
-   */
-  public refresh() {
-    const [head, tail, top] = this.scroll_with_computed(this.scrollTop);
-    this.setState({ top, head, tail });
-  }
-
 
   private scrollHook(e: any) {
     if (e && ctx.debug) {
