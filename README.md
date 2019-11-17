@@ -35,7 +35,7 @@
   export declare function VTScroll(id: number, param?: {
       top: number;
       left: number;
-  }): void | {
+  }): {
       top: number;
       left: number;
   };
