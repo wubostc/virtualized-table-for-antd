@@ -47,13 +47,15 @@ interface vt_opts extends Object {
 }
 
 /**
- * `INIT` -> `LOADED` -> `RUNNING` <-> `SUSPENDED`
+ * `INIT` -> `LOADED` -> `RUNNING` -> `SUSPENDED`
+ * `SUSPENDED` -> `WAITING` -> `RUNNING`
  *  */
 enum e_vt_state {
   INIT       = 1,
   LOADED     = 2,
   RUNNING    = 4,
   SUSPENDED  = 8,
+  WAITING    = 16,
 }
 
 /**
@@ -112,6 +114,9 @@ interface storeValue extends vt_opts {
   _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
                             * and default is null. */
   prev_row_count: number;
+
+  // persistent stroage index when switch `RUNNING` to `SUSPENDED`.
+  _index_persister: Set<number/* */>;
 }
 
 const store: Map<number, storeValue> = new Map();
@@ -190,6 +195,7 @@ function _RC_fixed_setState(ctx: storeValue, top: number, head: number, tail: nu
 
 
 function _Update_wrap_style(ctx: storeValue, h: number) {
+  if (ctx.load_the_trs_once === e_vt_state.WAITING) h = 0;
   ctx.wrap_inst.current.style.height = `${h}px`;
   ctx.wrap_inst.current.style.maxHeight = `${h}px`;
 }
@@ -410,6 +416,10 @@ class VTRow extends React.Component<VTRowProps> {
     const props: any = this.props;
     const index = props.children[0]!.props!.index;
 
+    if (ctx._index_persister.size && ctx._index_persister.delete(index)) {
+      return;
+    }
+
     if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
       const key = String(props["data-row-key"]);
       if (ctx._keys2free.delete(key)) {
@@ -444,8 +454,17 @@ class VTRow extends React.Component<VTRowProps> {
 
   public componentWillUnmount() {
     if (this.fixed !== e_fixed.NEITHER) return;
+
     const props: any = this.props;
     const index: number = props.children[0]!.props!.index;
+
+    // `RUNNING` -> `SUSPENDED`
+    if (ctx.load_the_trs_once === e_vt_state.SUSPENDED) {
+      ctx._index_persister.add(index);
+      return;
+    }
+
+
     if (ctx._keys2insert > 0) {
       ctx._keys2insert--;
       // nothing to do... just return.
@@ -478,15 +497,20 @@ class VTWrapper extends React.Component<VTWrapperProps> {
         {
           ({ head, tail, fixed }) => {
 
-            let trs = [];
+            let trs: any[] = [];
             let len = children.length;
+
+            if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+              // waitting for loading data as soon, just return this as following.
+              return <tbody {...restProps}>{trs}</tbody>;
+            }
 
             if ((ctx.row_count !== len) && (fixed === e_fixed.NEITHER)) {
               set_tr_cnt(ctx, len);
             }
 
 
-            if (len && fixed === e_fixed.NEITHER) {
+            if (len >= 0 && fixed === e_fixed.NEITHER) {
               let offset: number;
               if (tail > len) {
                 offset = tail - len;
@@ -520,10 +544,6 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 for (let i = head; i < tail; ++i) {
                   trs.push(children[i]);
                 }
-                /* init keys */
-                ctx._prev_keys = new Set();
-                ctx._keys2free = new Set();
-                ctx._keys2insert = 0;
 
                 // reset `prev_row_count` as same as `row_count`
                 ctx.prev_row_count = ctx.row_count;
@@ -640,7 +660,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             } /* len && this.fixed === e_fixed.NEITHER */
 
             /* fixed L R */
-            if (len && fixed !== e_fixed.NEITHER) {
+            if (len >= 0 && fixed !== e_fixed.NEITHER) {
               for (let i = head; i < tail; ++i) {
                 trs.push(children[i]);
               }
@@ -712,22 +732,11 @@ class VT extends React.Component<VTProps, {
       this.fixed = e_fixed.R;
     } else {
       this.fixed = e_fixed.NEITHER;
-      ctx._React_ptr = this; // always set. even if it is `NEITHER`.
     }
 
 
 
     if (this.fixed === e_fixed.NEITHER) {
-
-      if (ctx.load_the_trs_once !== e_vt_state.SUSPENDED) {
-        ctx.possible_hight_per_tr = -1;
-        ctx.computed_h = 0;
-        ctx.re_computed = 0;
-        ctx.row_height = [];
-        ctx.row_count = 0;
-      }
-      ctx.VTScroll = this.scroll.bind(this);
-      ctx.load_the_trs_once = e_vt_state.INIT;
 
       this.user_context = {};
 
@@ -748,28 +757,54 @@ class VT extends React.Component<VTProps, {
     }
 
 
-    // init context, all of the `L` `R` and `NEITHER`.
-    ctx.WH = 0;
 
-    if (this.fixed === e_fixed.NEITHER) {
-      // init context.
-      ctx.PAINT_ADD = new Map();
-      ctx.PAINT_SADD = new Map();
-      ctx.PAINT_FREE = new Set();
-      ctx.PAINT_SFREE = new Set();
-      ctx.HND_PAINT = 0;
+    if (ctx.load_the_trs_once === e_vt_state.INIT) {
+      if (this.fixed === e_fixed.NEITHER) {
 
-      ctx.PSRA = [-1, -1];
-      ctx.PSRB = [-1, -1];
+        ctx.possible_hight_per_tr = -1;
+        ctx.computed_h = 0;
+        ctx.re_computed = 0;
+        ctx.row_height = [];
+        ctx.row_count = 0;
+        ctx.prev_row_count = 0;
+  
+        ctx.PSRA = [-1, -1];
+        ctx.PSRB = [-1, -1];
+        ctx.PAINT_ADD = new Map();
+        ctx.PAINT_SADD = new Map();
+        ctx.PAINT_FREE = new Set();
+        ctx.PAINT_SFREE = new Set();
+  
+        /* init keys */
+        ctx._prev_keys = new Set();
+        ctx._keys2free = new Set();
+        ctx._keys2insert = 0;
+  
+        __DIAGNOSIS__(ctx);
 
-      ctx._keys2free = null;
-      ctx._keys2insert = 0;
-      ctx._prev_keys = null;
-      ctx.prev_row_count = 0;
+        ctx._index_persister = new Set();
+      }
 
-      __DIAGNOSIS__(ctx);
+      // init context for all of the `L` `R` and `NEITHER`.
+      ctx.WH = 0;
+
+    } else {
+      if (this.fixed === e_fixed.NEITHER) {
+        console.assert(ctx.load_the_trs_once === e_vt_state.SUSPENDED);
+
+        /* `SUSPENDED` -> `WAITING` */
+        ctx.load_the_trs_once = e_vt_state.WAITING;
+
+        const { state, scrollTop, scrollLeft } = ctx._React_ptr;
+        this.state = { head: state.head, top: state.top, tail: state.tail };
+        this.scrollTop = scrollTop;
+        this.scrollLeft = scrollLeft;
+      }
     }
 
+    // always to set. even if it is not `NEITHER`.
+    ctx._React_ptr = this;
+    ctx.VTScroll = this.scroll.bind(this);
   }
 
   public render() {
@@ -841,18 +876,26 @@ class VT extends React.Component<VTProps, {
     }
 
     // 0 - head, 2 - body
-    if (this.props.children[2].props.children.length) {
-      // `load_the_trs_once` is changed by `VTRow`.
-      console.assert(ctx.load_the_trs_once === e_vt_state.LOADED);
+    const children = this.props.children[2].props.children;
 
-      ctx.load_the_trs_once = e_vt_state.RUNNING;
-      this.scrollHook({
-        target: { scrollTop: 0, scrollLeft: 0 },
-        flags: SCROLLEVT_INIT,
-      });
-
+    if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+      /* switch `SUSPENDED` to `WAITING` from VT's constructor. */
+      if (children.length) {
+        // just only switch to `RUNNING`.
+        ctx.load_the_trs_once = e_vt_state.RUNNING;
+      }
     } else {
-      console.assert(ctx.load_the_trs_once === e_vt_state.INIT);
+      if (children.length) {
+        // `load_the_trs_once` is changed by `VTRow`.
+        console.assert(ctx.load_the_trs_once === e_vt_state.LOADED);
+        ctx.load_the_trs_once = e_vt_state.RUNNING;
+        this.scrollHook({
+          target: { scrollTop: 0, scrollLeft: 0 },
+          flags: SCROLLEVT_INIT,
+        });
+      } else {
+        console.assert(ctx.load_the_trs_once === e_vt_state.INIT);
+      }
     }
 
   }
@@ -866,6 +909,7 @@ class VT extends React.Component<VTProps, {
     }
 
     if (ctx.load_the_trs_once === e_vt_state.LOADED) {
+      // `LOADED` -> `RUNNING`.
       ctx.load_the_trs_once = e_vt_state.RUNNING;
 
       // force update for initialization
@@ -873,6 +917,17 @@ class VT extends React.Component<VTProps, {
         target: { scrollTop: 0, scrollLeft: 0 },
         flags: SCROLLEVT_INIT,
       });
+    }
+
+    if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+      // Do you get the previous data back?
+      if (this.props.children[2].props.children.length) {
+        // Y, `WAITING` -> `RUNNING`.
+        ctx.load_the_trs_once = e_vt_state.RUNNING;
+      } else {
+        // N, keep `WAITING` then just return.
+        return;
+      }
     }
 
     if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
@@ -904,6 +959,8 @@ class VT extends React.Component<VTProps, {
       store.delete(ID);
     } else {
       ctx.load_the_trs_once = e_vt_state.SUSPENDED;
+      const { state, scrollTop, scrollLeft } = ctx._React_ptr;
+      ctx._React_ptr = { state, scrollTop, scrollLeft };
     }
     this.setState = (...args) => null;
   }
@@ -1024,7 +1081,7 @@ class VT extends React.Component<VTProps, {
     }
 
     if (ctx.debug) {
-      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollTop);
+      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollLeft);
     }
 
     // checks every tr's height, so it may be take some times...
@@ -1083,34 +1140,23 @@ class VT extends React.Component<VTProps, {
     if (flags & SCROLLEVT_RESTORETO) {
       log_debug(ctx, "SCROLLEVT_RESTORETO");
 
-      if (head === prev_head && tail === prev_tail && top === prev_top) {
-        this.HNDID_RAF = 0;
-
-        flags &= ~SCROLLEVT_BARRIER;
-        flags &= ~SCROLLEVT_RESTORETO;
-        this.restoring = false;
-
-        if (this.event_queue.length) this.scrollHook(null); // consume the next.
-        return;
-      }
-
-      this.restoring = true;
-
-
       this.setState({ top, head, tail }, () => {
+        // to force update style assign `WH` to 0.
+        ctx.WH = 0;
+        update_wrap_style(ctx, ctx.computed_h);
+
         scroll_to(ctx, scrollTop, scrollLeft);
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_BARRIER;
         flags &= ~SCROLLEVT_RESTORETO;
 
-        this.restoring = false;
         if (this.event_queue.length) this.scrollHook(null); // consume the next.
       });
 
       _RC_fixed_setState(ctx, top, head, tail);
       return;
-    } 
+    }
     
     if (flags & SCROLLEVT_NATIVE) {
       log_debug(ctx, "SCROLLEVT_NATIVE");
@@ -1193,6 +1239,7 @@ function init(id: number) {
     const { VT, Wrapper, Row, S } = VT_CONTEXT.Switch(id);
     inside.components = { table: VT, wrapper: Wrapper, row: Row };
     inside.context = S;
+    // start -> `INIT`
     inside.load_the_trs_once = e_vt_state.INIT;
   }
   return inside;
