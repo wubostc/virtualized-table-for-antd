@@ -283,8 +283,10 @@ function _repainting(ctx: storeValue) {
     PAINT_ADD.clear();
     PAINT_SADD.clear();
 
-    // output to the buffer
-    update_wrap_style(ctx, ctx.computed_h);
+    if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+      // output to the buffer
+      update_wrap_style(ctx, ctx.computed_h);
+    }
 
     // free this handle manually.
     ctx.HND_PAINT = 0;
@@ -970,12 +972,6 @@ class VT extends React.Component<VTProps, {
 
 
   private scrollHook(e: any) {
-    if (e && ctx.debug) {
-      console.debug(
-        `[${ctx.id}][scrollHook] scrollTop: %d, scrollLeft: %d`,
-        e.target.scrollTop,
-        e.target.scrollLeft);
-    }
 
     if (e) {
       if (e.flags) {
@@ -1023,8 +1019,12 @@ class VT extends React.Component<VTProps, {
     let scrollLeft = e.target.scrollLeft;
     let flags = e.flags;
 
-    if (ctx.onScroll) {
+    if (ctx.onScroll && (flags & SCROLLEVT_NATIVE)) {
       ctx.onScroll({ top: scrollTop, left: scrollLeft });
+    }
+
+    if (ctx.debug) {
+      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollTop);
     }
 
     // checks every tr's height, so it may be take some times...
@@ -1115,15 +1115,15 @@ class VT extends React.Component<VTProps, {
     if (flags & SCROLLEVT_NATIVE) {
       log_debug(ctx, "SCROLLEVT_NATIVE");
 
+      this.scrollLeft = scrollLeft;
+      this.scrollTop = scrollTop;
+
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
 
         flags &= ~SCROLLEVT_NATIVE;
         return;
       }
-
-      this.scrollLeft = scrollLeft;
-      this.scrollTop = scrollTop;
 
       this.setState({ top, head, tail }, () => {
         this.HNDID_RAF = 0;
