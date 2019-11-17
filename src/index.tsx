@@ -718,7 +718,6 @@ class VT extends React.Component<VTProps, {
     this.wrap_inst = React.createRef();
     this.scrollTop = 0;
     this.scrollLeft = 0;
-    this.restoring = false;
     this.state = {
       top: 0,
       head: 0,
@@ -737,6 +736,7 @@ class VT extends React.Component<VTProps, {
 
 
     if (this.fixed === e_fixed.NEITHER) {
+      this.restoring = false;
 
       this.user_context = {};
 
@@ -802,9 +802,10 @@ class VT extends React.Component<VTProps, {
       }
     }
 
-    // always to set. even if it is not `NEITHER`.
-    ctx._React_ptr = this;
-    ctx.VTScroll = this.scroll.bind(this);
+    if (this.fixed === e_fixed.NEITHER) {
+      ctx.VTScroll = this.scroll.bind(this);
+      ctx._React_ptr = this;
+    }
   }
 
   public render() {

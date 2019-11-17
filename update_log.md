@@ -2,7 +2,11 @@
 ### this is first stable version, and the main changes are:
   1. removed `VTRefresh`.
   1. removed `height`, now it depends entirely on `scroll.y`.
-
+  1. redesigned interface `VTScroll`.
+  1. much bugs was fixed.
+  1. fast, fast and more faster, with my best trying that all operations costs time about O(1).
+  1. browers required support `requestAnimationFrame`.
+> I suggest you to test this library carefully after installing it.
 
 
 ## 0.5.5
