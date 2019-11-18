@@ -285,7 +285,7 @@
         columns={columns}
         dataSource={data}
         scroll={{ x: 1500, y: 300 }}
-        components={VTComponents({ id: 1000, height: 500, })}
+        components={VTComponents({ id: 1000 })}
       />
     );
   }

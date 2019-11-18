@@ -1,3 +1,7 @@
+## 0.6.1
+  1. removed debug info `console.log` (sorry, guys~).
+
+
 ## 0.6.0
 ### this is first stable version, and the main changes are:
   1. removed `VTRefresh`.

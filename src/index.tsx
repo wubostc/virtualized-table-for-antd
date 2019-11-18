@@ -233,16 +233,12 @@ function scroll_to(ctx: storeValue, top: number, left: number) {
  */
 function apply_h(ctx: storeValue, idx: number, h: number) {
   console.assert(!isNaN(h), `failed to apply height with index ${idx}!`);
-
-  console.log("add", idx, h);
-
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
 }
 
 
 function free_h_tr(ctx: storeValue, idx: number) {
-  console.log("free", idx, ctx.row_height[idx]);
   console.assert(!isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
 }
@@ -336,13 +332,13 @@ function repainting_with_sfree(ctx: storeValue, idx: number) {
 function __DIAGNOSIS__(ctx: storeValue) {
   Object.defineProperty(ctx, "__DIAGNOSIS__", {
     get() {
-      console.log("OoOoOoO DIAGNOSIS OoOoOoO");
+      console.debug("OoOoOoO DIAGNOSIS OoOoOoO");
       let total = 0;
       for (let i = 0; i < ctx.row_count; ++i) {
         total += ctx.row_height[i];
       }
-      console.log("Verify computed_h", total);
-      console.log("OoOoOoOoOoOoOOoOoOoOoOoOo");
+      console.debug("Verify computed_h", total);
+      console.debug("OoOoOoOoOoOoOOoOoOoOoOoOo");
     },
     configurable: false,
     enumerable: false,
