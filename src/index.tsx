@@ -351,10 +351,6 @@ function log_debug(ctx: storeValue & obj, msg: string) {
     __DIAGNOSIS__(ctx);
     const ts = new Date().getTime();
     console.debug(`%c[${ctx.id}][${ts}][${msg}] vt`, "color:#a00", ctx);
-    if (ctx._lvt_ctx)
-      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedleft`, "color:#a00", ctx._lvt_ctx);
-    if (ctx._rvt_ctx)
-      console.debug(`%c[${ctx.id}][${ts}][${msg}] vt-fixedright`, "color:#a00", ctx._rvt_ctx);
   }
 }
 
