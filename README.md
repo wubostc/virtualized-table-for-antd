@@ -1,9 +1,12 @@
 # The virtualized table component for Ant Design
 
 
-*[update_log.md](https://github.com/wubostc/virtualized-table-for-antd/blob/master/update_log.md)*
+![npm](https://img.shields.io/npm/v/virtualizedtableforantd)
+![npm](https://img.shields.io/npm/dm/virtualizedtableforantd)
 
 + Install
+
+[![NPM](https://nodei.co/npm/virtualizedtableforantd.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/virtualizedtableforantd/)
   ```shell
   npm i --save virtualizedtableforantd
   ```
