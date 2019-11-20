@@ -12,23 +12,10 @@
       {
         "targets": {
           "browsers": [
-            "> 5%",
-            "last 2 major versions",
-            "ie >= 9",
-            "not ie_mob >= 1",
-            "not bb >= 1",
-            "not baidu >= 1",
-            "not and_uc >= 1",
-            "not and_qq >= 1",
-            "not op_mini all",
-            "not op_mob >= 1",
-            "not samsung >= 1",
-            "not safari >= 1",
-            "not edge >= 1",
-            "not and_chr >= 1",
-            "not and_ff >= 1",
-            "not android >= 1",
-            "not ios_saf >= 1"
+            "last 2 version",
+            "Firefox ESR",
+            "> 1%",
+            "ie >= 9"
           ]
         },
         "exclude": [
