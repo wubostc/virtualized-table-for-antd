@@ -71,11 +71,8 @@ enum e_fixed {
 interface storeValue extends vt_opts {
   height: number; // will use the Table.scroll.y if unset.
 
-  components: {
-    table: React.ReactType,
-    wrapper: React.ReactType,
-    row: React.ReactType
-  };
+  _vtcomponents: TableComponents; // virtual layer.
+  components: TableComponents;    // implementation layer.
   computed_h: number;
   load_the_trs_once: e_vt_state;
   possible_hight_per_tr: number;
@@ -143,6 +140,29 @@ function _make_evt(ne:　Event): SimEvent {
     flags: SCROLLEVT_NATIVE
   };
 }
+
+
+
+/**
+ * Implementation Layer.
+ */
+/** AntD.TableComponent.table */
+const Table = React.forwardRef(function Table(props: any, ref) {
+  const { style, children, ...rest } = props;
+  return <table ref={ref} style={style} {...rest}>{children}</table>;
+});
+/** AntD.TableComponent.body.wrapper */
+function Wrapper(props: any) {
+  const { children, ...rest } = props;
+  return <tbody {...rest}>{children}</tbody>; 
+}
+/** AntD.TableComponent.body.row */
+const Row = React.forwardRef(function Row(props: any, ref) {
+  const { children, ...rest } = props;
+  return <tr {...rest} ref={ref}>{children}</tr>;
+});
+
+
 
 /**
  * define CONSTANTs.
@@ -395,7 +415,8 @@ class VTRow extends React.Component<VTRowProps> {
         {
           ({ fixed }) => {
             if (this.fixed === e_fixed.UNKNOW) this.fixed = fixed;
-            return <tr {...restProps} ref={this.inst}>{children}</tr>;
+            const Row = ctx.components.body.row;
+            return <Row {...restProps} ref={this.inst}>{children}</Row>;
           }
         }
       </S.Consumer>
@@ -492,9 +513,11 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             let trs: any[] = [];
             let len = children.length;
 
+            const Wrapper = ctx.components.body.wrapper;
+
             if (ctx.load_the_trs_once === e_vt_state.WAITING) {
               // waitting for loading data as soon, just return this as following.
-              return <tbody {...restProps}>{trs}</tbody>;
+              return <Wrapper {...restProps}>{trs}</Wrapper>;
             }
 
             if ((ctx.row_count !== len) && (fixed === e_fixed.NEITHER)) {
@@ -658,7 +681,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               }
             }
 
-            return <tbody {...restProps}>{trs}</tbody>;
+            return <Wrapper {...restProps}>{trs}</Wrapper>;
           }
         }
       </S.Consumer>
@@ -808,14 +831,16 @@ class VT extends React.Component<VTProps, {
     style.top = top;
     const { width, ...rest_style } = style;
 
+    const Table = ctx.components.table;
+
     return (
       <div
         ref={this.wrap_inst}
         style={{ width, position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
       >
-        <table {...rest} ref={this.inst} style={rest_style}>
-          <S.Provider value={{ tail, head, fixed: this.fixed, ...this.user_context }}>{children}</S.Provider>
-        </table>
+        <S.Provider value={{ tail, head, fixed: this.fixed, ...this.user_context }}>
+          <Table {...rest} ref={this.inst} style={rest_style}>{children}</Table>
+        </S.Provider>
       </div>
     );
 
@@ -1208,14 +1233,10 @@ class VT extends React.Component<VTProps, {
     }
   }
 
-
-  public static Wrapper = VTWrapper;
-
-  public static Row = VTRow;
 }
 
 
-return { VT, Wrapper: VTWrapper, Row: VTRow, S };
+return { VT, VTWrapper, VTRow, S };
 
 } // Switch
 
@@ -1225,12 +1246,42 @@ function ASSERT_ID(id: number) {
   console.assert(typeof id === "number" && id > 0);
 }
 
+function _set_components(ctx: storeValue, components: TableComponents) {
+  const { table, body, header } = components;
+  ctx.components.body = { ...ctx.components.body, ...body };
+  if (body && body.cell) {
+    ctx._vtcomponents.body.cell = body.cell;
+  } 
+  if (header) {
+    ctx.components.header = header;
+    ctx._vtcomponents.header = header;
+  }
+  if (table) {
+    ctx.components.table = table;
+  }
+}
+
 function init(id: number) {
   const inside = store.get(id) || {} as storeValue;
-  if (!inside.components) {
+  if (!inside._vtcomponents) {
     store.set(id, inside);
-    const { VT, Wrapper, Row, S } = VT_CONTEXT.Switch(id);
-    inside.components = { table: VT, wrapper: Wrapper, row: Row };
+    const { VT, VTWrapper, VTRow, S } = VT_CONTEXT.Switch(id);
+    // set the virtual layer.
+    inside._vtcomponents = {
+      table: VT,
+      body: {
+        wrapper: VTWrapper,
+        row: VTRow,
+      }
+    };
+    // set the default implementation layer.
+    _set_components(inside, {
+      table: Table,
+      body: {
+        wrapper: Wrapper,
+        row: Row,
+      }
+    });
     inside.context = S;
     // start -> `INIT`
     inside.load_the_trs_once = e_vt_state.INIT;
@@ -1250,6 +1301,11 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
                   Now it depends entirely on \`scroll.y\`.`);
   }
 
+  if (Object.hasOwnProperty.call(vt_opts, "reflection")) {
+    console.warn(`The property \`vt_opts.reflection\`
+                  will be deprecated in the next release.`);
+  }
+
   const inside = init(vt_opts.id);
 
 
@@ -1266,13 +1322,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
     console.debug(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
   }
 
-  return {
-    table: inside.components.table,
-    body: {
-      wrapper: inside.components.wrapper,
-      row: inside.components.row
-    }
-  };
+  return inside._vtcomponents;
 }
 
 export
@@ -1282,8 +1332,17 @@ function getVTContext(id: number) {
 }
 
 export
-function getVTComponents(id: number) {
+function setComponents(id: number, components: TableComponents) {
   ASSERT_ID(id);
+  _set_components(init(id), components);
+}
+
+/**
+ * @deprecated
+ */
+export
+function getVTComponents(id: number) {
+  console.warn("This function will be deprecated in the next release.")
   return init(id).components;
 }
 
