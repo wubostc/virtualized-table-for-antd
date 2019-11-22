@@ -1275,6 +1275,7 @@ function init(id: number) {
       }
     };
     // set the default implementation layer.
+    inside.components = {};
     _set_components(inside, {
       table: Table,
       body: {
