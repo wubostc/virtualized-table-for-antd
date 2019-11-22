@@ -646,8 +646,16 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
                 /* PSR's range: [begin, end) */
                 if (PSRB[0] === -1) {
-                  // init Shadow Rows, just do `apply_h`.
-                  srs_diff(ctx, PSRB, tail, len, tail, tail);
+                  // init Rows.
+                  const rows = new Array(tail - 1/* substract the first row */).fill(0, 0, tail - 1);
+                  ctx.row_height = ctx.row_height.concat(rows);
+                  // init Shadow Rows.
+                  const shadow_rows = new Array(len - tail).fill(ctx.possible_hight_per_tr, 0, len - tail);
+                  ctx.row_height = ctx.row_height.concat(shadow_rows);
+                  ctx.computed_h = ctx.computed_h + ctx.possible_hight_per_tr * (len - tail);
+
+                  PSRB[0] = tail;
+                  PSRB[1] = len;
                 } else {
                   if (len < prev_len) {
                     /* free some rows */
@@ -664,6 +672,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
                 if (PSRA[0] === -1) {
                   // init Shadow Rows, just do `apply_h`.
+                  console.assert(head === 0);
                   srs_diff(ctx, PSRA, 0, head, 0, 0);
                 } else {
                   srs_diff(ctx, PSRA, 0, head, PSRA[0], fixed_PSRA1 + SR_n2delete);
