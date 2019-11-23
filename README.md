@@ -149,57 +149,11 @@
   ```
 
 
-+ Editable Table(decorator)
++ Editable Table
 
-  > Note: the opt `reflection` only support `getVTComponents(1000).table`.
+  > there are two examples here `./test/CustomRows.jsx`,`./test/Editable Rows.jsx`
 
-  ```typescript
-  import React from 'react';
-  import { Form, Input } from "antd";
 
-  const EditableComponents = getVTComponents(1000);
-  EditableComponents.table = Form.create()(EditableComponents.table); 
-
-  class C extends React.Component {
-    constructor(...args) {
-      super(...args);
-      this.EditableComponents = EditableComponents;
-      this.EditableContext = getVTContext(1000);
-    }
-
-    render() {
-      const Context = this.EditableContext;
-      const Consumer = Context.Consumer;
-
-      return (
-        <Table
-          columns={[{
-            title: "from reflection",
-            render: (text) => {
-              return (
-                <Comsumer>
-                {
-                  (form) => { // (form) is the same as `reflection: ["form"]`
-                    return (
-                      <Form.Item>
-                        {form.getFieldDecorator("myreflection")(<Input />)}
-                      </Form.Item>
-                    );
-                  }
-                }
-                </Comsumer>
-              );
-            }
-          }]}
-          components={VTComponents({ id: 1000, reflection: ["form"] })}
-          scroll={{ y: 500 }}
-          dataSource={[{}]}
-        />
-      );
-
-    }
-  }
-  ```
 
 + support column.fixed
   ```typescript
