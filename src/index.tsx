@@ -215,6 +215,9 @@ function _RC_fixed_setState(ctx: storeValue, top: number, head: number, tail: nu
 
 
 function _Update_wrap_style(ctx: storeValue, h: number) {
+  // a component has unmounted.
+  if (!ctx.wrap_inst.current) return;
+
   if (ctx.load_the_trs_once === e_vt_state.WAITING) h = 0;
   ctx.wrap_inst.current.style.height = `${h}px`;
   ctx.wrap_inst.current.style.maxHeight = `${h}px`;
