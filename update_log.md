@@ -1,3 +1,10 @@
+## 0.6.2
+  1. an unmounted component will not update style.
+  1. fix a bug.(#25)
+  1. `getComponent` has been deprecated, use `setComponent` instead(#26).
+  1. adjusted log format.
+
+
 ## 0.6.1
   1. removed debug info `console.log` (sorry, guys~).
 

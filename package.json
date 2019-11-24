@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "The virtualized table component for ant design, using typescript.",
   "keywords": [
     "antd",
@@ -12,7 +12,8 @@
     "scroll",
     "virtual",
     "无限滚动表格",
-    "虚拟表格"
+    "虚拟表格",
+    "无限滚动"
   ],
   "main": "lib/index.js",
   "module": "es/index.js",
