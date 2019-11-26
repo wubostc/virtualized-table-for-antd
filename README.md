@@ -18,7 +18,7 @@
   interface vt_opts extends Object {
       readonly id: number;
       overscanRowCount?: number; // default 5
-      reflection?: string[] | string;
+      reflection?: string[] | string; /** @deprecated */
       onScroll?: ({ left, top }: {
           top: number;
           left: number;
@@ -30,11 +30,8 @@
   /* all APIs */
   export declare function VTComponents(vt_opts: vt_opts): TableComponents;
   export declare function getVTContext(id: number): React.Context<vt_ctx>;
-  export declare function getVTComponents(id: number): {
-      table: React.ReactType<any>;
-      wrapper: React.ReactType<any>;
-      row: React.ReactType<any>;
-  };
+  export declare function setComponents(id: number, components: TableComponents): void;
+  export declare function getVTComponents(id: number): TableComponents; /** @deprecated */
   export declare function VTScroll(id: number, param?: {
       top: number;
       left: number;
