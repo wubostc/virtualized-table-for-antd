@@ -28,29 +28,38 @@ interface obj extends Object {
   [field: string]: any;
 }
 
-interface vt_ctx {
-  head: number;
-  tail: number;
-  fixed: e_fixed;
-  [reflection: string]: any;
-}
 
 export
 interface vt_opts extends Object {
   readonly id: number;
-  overscanRowCount?: number; // default 5
+  /**
+   * @default 5
+   */
+  overscanRowCount?: number;
+
+  /**
+   * @deprecated
+   */
   reflection?: string[] | string;
 
   onScroll?: ({ left, top }: { top: number, left: number }) => void;
-  destroy?: boolean; // default false
+
+  /**
+   * @default false
+   */
+  destroy?: boolean;
+
+  /**
+   * @default false
+   */
   debug?: boolean;
 }
 
 /**
  * `INIT` -> `LOADED` -> `RUNNING` -> `SUSPENDED`
  * `SUSPENDED` -> `WAITING` -> `RUNNING`
- *  */
-enum e_vt_state {
+ */
+enum e_VT_STATE {
   INIT       = 1,
   LOADED     = 2,
   RUNNING    = 4,
@@ -61,34 +70,43 @@ enum e_vt_state {
 /**
  * `L`: fixed: "left", `R`: fixed: "right"
  */
-enum e_fixed {
+enum e_FIXED {
   UNKNOW = -1,
   NEITHER,
   L,
   R
 }
 
+
+interface vt_ctx {
+  head: number;
+  tail: number;
+  fixed: e_FIXED;
+}
+
+
 interface VT_CONTEXT extends vt_opts {
   _y: number; // will use the Table.scroll.y.
-  _raw_y: number | string;
+  _raw_y: number | string; // this is the same as the `Table.scroll.y`.
 
   _vtcomponents: TableComponents; // virtual layer.
   components: TableComponents;    // implementation layer.
   computed_h: number;
-  load_the_trs_once: e_vt_state;
+  vt_state: e_VT_STATE;
   possible_hight_per_tr: number;
   
   /* 0: needn't to recalculate, > 0: to add, < 0 to subtract */
   re_computed: number;
   row_height: number[];
   row_count: number;
+  prev_row_count: number;
   wrap_inst: React.RefObject<HTMLDivElement>;
   context: React.Context<vt_ctx>;
 
   // return the last state.
   VTScroll?: (param?: { top: number, left: number }) => { top: number, left: number };
 
-  _React_ptr: any; // pointer to the instance of `VT`.
+  _React_ptr: any; // a pointer to the instance of `VTable`.
 
   _lvt_ctx: VT_CONTEXT; // fixed left.
   _rvt_ctx: VT_CONTEXT; // fixed right.
@@ -101,23 +119,26 @@ interface VT_CONTEXT extends vt_opts {
   PAINT_ADD: Map<number/* index */, HTMLTableRowElement>;
   PAINT_SADD: Map<number/* shadow index */, number/* height */>;
   PAINT_FREE: Set<number/* index */>;
-  PAINT_SFREE: Set<number/* index */>;
+  PAINT_SFREE: Set<number/* shadow index */>;
 
   /* stores [begin, end], `INIT`: [-1, -1] */
   PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
-  _keys2free: Set<string/* key */>;
-  _keys2insert: number/* indexex */;
-  _prev_keys: Set<string/* key */>; /* stores a Set of keys of the previous rendering,
-                            * and default is null. */
-  prev_row_count: number;
+  /* render with React. */
+  _keys2free: Set<string/* key */>; // a set of the row's key that will be freed manually.
+  _keys2insert: number; // a number of indexes.
+  _prev_keys: Set<string/* key */>; // stores a set of keys of the previous rendering.
 
   // persistent stroage index when switch `RUNNING` to `SUSPENDED`.
-  _index_persister: Set<number/* */>;
+  // it will prevent to change the `ctx._computed_h`.
+  _index_persister: Set<number/* index */>;
 }
 
-const store: Map<number, VT_CONTEXT> = new Map();
+/**
+ * @global
+ */
+const vt_context: Map<number, VT_CONTEXT> = new Map();
 
 /**
  * THE EVENTS OF SCROLLING.
@@ -132,6 +153,7 @@ const SCROLLEVT_MASK       = SCROLLEVT_BARRIER | SCROLLEVT_RECOMPUTE;
 
 type SimEvent = { target: { scrollTop: number, scrollLeft: number }, flags: number };
 
+// the factory function returns a SimEvent.
 function _make_evt(ne:　Event): SimEvent {
   return {
     target: {
@@ -219,7 +241,7 @@ function _Update_wrap_style(ctx: VT_CONTEXT, h: number) {
   // a component has unmounted.
   if (!ctx.wrap_inst.current) return;
 
-  if (ctx.load_the_trs_once === e_vt_state.WAITING) h = 0;
+  if (ctx.vt_state === e_VT_STATE.WAITING) h = 0;
   ctx.wrap_inst.current.style.height = `${h}px`;
   ctx.wrap_inst.current.style.maxHeight = `${h}px`;
 }
@@ -236,6 +258,7 @@ function update_wrap_style(ctx: VT_CONTEXT, h: number) {
 }
 
 
+// scrolls the parent element to specified location.
 function _scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
   const ele = ctx.wrap_inst.current.parentElement;
   /** ie */
@@ -244,6 +267,7 @@ function _scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
 }
 
 
+// a wrapper function for `_scroll_to`.
 function scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
   _scroll_to(ctx, top, left);
 
@@ -252,17 +276,14 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
 }
 
 
-/**
- * running level: `RUNNING`.
- */
-function apply_h(ctx: VT_CONTEXT, idx: number, h: number) {
+function add_h(ctx: VT_CONTEXT, idx: number, h: number) {
   console.assert(!isNaN(h), `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
 }
 
 
-function free_h_tr(ctx: VT_CONTEXT, idx: number) {
+function free_h(ctx: VT_CONTEXT, idx: number) {
   console.assert(!isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
 }
@@ -276,7 +297,7 @@ function _repainting(ctx: VT_CONTEXT) {
 
     if (PAINT_FREE.size) {
       for (let idx of PAINT_FREE) {
-        free_h_tr(ctx, idx);
+        free_h(ctx, idx);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
       console.assert(ctx.computed_h >= 0);
@@ -284,7 +305,7 @@ function _repainting(ctx: VT_CONTEXT) {
 
     if (PAINT_SFREE.size) {
       for (let idx of PAINT_SFREE) {
-        free_h_tr(ctx, idx);
+        free_h(ctx, idx);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
       console.assert(ctx.computed_h >= 0);
@@ -292,7 +313,7 @@ function _repainting(ctx: VT_CONTEXT) {
 
     if (PAINT_ADD.size) {
       for (let [idx, el] of PAINT_ADD) {
-        apply_h(ctx, idx, el.offsetHeight);
+        add_h(ctx, idx, el.offsetHeight);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
       console.assert(ctx.computed_h >= 0);
@@ -300,7 +321,7 @@ function _repainting(ctx: VT_CONTEXT) {
 
     if (PAINT_SADD.size) {
       for (let [idx, h] of PAINT_SADD) {
-        apply_h(ctx, idx, h);
+        add_h(ctx, idx, h);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
       console.assert(ctx.computed_h >= 0);
@@ -313,7 +334,7 @@ function _repainting(ctx: VT_CONTEXT) {
     PAINT_ADD.clear();
     PAINT_SADD.clear();
 
-    if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+    if (ctx.vt_state === e_VT_STATE.RUNNING) {
       // output to the buffer
       update_wrap_style(ctx, ctx.computed_h);
     }
@@ -373,7 +394,7 @@ function __DIAGNOSIS__(ctx: VT_CONTEXT) {
   });
 }
 
-function log_debug(ctx: VT_CONTEXT & obj, msg: string) {
+function log_debug(ctx: VT_CONTEXT, msg: string) {
   if (ctx.debug) {
     ctx = { ...ctx };
     __DIAGNOSIS__(ctx);
@@ -394,9 +415,9 @@ const VTContext = {
 // using closure
 Switch(ID: number) {
 
-const ctx = store.get(ID);
+const ctx = vt_context.get(ID);
 
-const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: -1 });
+const S = React.createContext<vt_ctx>({ head: 0, tail: 0, fixed: e_FIXED.UNKNOW });
 
 
 type VTRowProps = {
@@ -406,13 +427,13 @@ type VTRowProps = {
 class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
-  private fixed: e_fixed;
+  private fixed: e_FIXED;
 
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
 
-    this.fixed = e_fixed.UNKNOW;
+    this.fixed = e_FIXED.UNKNOW;
 
   }
 
@@ -422,7 +443,7 @@ class VTRow extends React.Component<VTRowProps> {
       <S.Consumer>
         {
           ({ fixed }) => {
-            if (this.fixed === e_fixed.UNKNOW) this.fixed = fixed;
+            if (this.fixed === e_FIXED.UNKNOW) this.fixed = fixed;
             const Row = ctx.components.body.row;
             return <Row {...restProps} ref={this.inst}>{children}</Row>;
           }
@@ -432,7 +453,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidMount() {
-    if (this.fixed !== e_fixed.NEITHER) return;
+    if (this.fixed !== e_FIXED.NEITHER) return;
 
     const props: any = this.props;
     const index = props.children[0]!.props!.index;
@@ -441,7 +462,7 @@ class VTRow extends React.Component<VTRowProps> {
       return;
     }
 
-    if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+    if (ctx.vt_state === e_VT_STATE.RUNNING) {
       const key = String(props["data-row-key"]);
       if (ctx._keys2free.delete(key)) {
         repainting_with_free(ctx, index);
@@ -449,20 +470,20 @@ class VTRow extends React.Component<VTRowProps> {
       repainting_with_add(ctx, index, this.inst.current);
     } else {
       /* init context */
-      console.assert(ctx.load_the_trs_once === e_vt_state.INIT);
-      ctx.load_the_trs_once = e_vt_state.LOADED;
+      console.assert(ctx.vt_state === e_VT_STATE.INIT);
+      ctx.vt_state = e_VT_STATE.LOADED;
       const h = this.inst.current.offsetHeight;
       if (ctx.possible_hight_per_tr === -1) {
         /* assign only once */
         ctx.possible_hight_per_tr = h;
       }
       ctx.computed_h = 0; // reset initial value.
-      apply_h(ctx, index, h);
+      add_h(ctx, index, h);
     }
   }
 
   public componentDidUpdate() {
-    if (this.fixed !== e_fixed.NEITHER) return;
+    if (this.fixed !== e_FIXED.NEITHER) return;
 
     const index = this.props.children[0]!.props!.index;
     if (ctx.PAINT_FREE.size && ctx.PAINT_FREE.has(index)) {
@@ -474,13 +495,13 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentWillUnmount() {
-    if (this.fixed !== e_fixed.NEITHER) return;
+    if (this.fixed !== e_FIXED.NEITHER) return;
 
     const props: any = this.props;
     const index: number = props.children[0]!.props!.index;
 
     // `RUNNING` -> `SUSPENDED`
-    if (ctx.load_the_trs_once === e_vt_state.SUSPENDED) {
+    if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
       ctx._index_persister.add(index);
       return;
     }
@@ -523,17 +544,17 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
             const Wrapper = ctx.components.body.wrapper;
 
-            if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+            if (ctx.vt_state === e_VT_STATE.WAITING) {
               // waitting for loading data as soon, just return this as following.
               return <Wrapper {...restProps}>{trs}</Wrapper>;
             }
 
-            if ((ctx.row_count !== len) && (fixed === e_fixed.NEITHER)) {
+            if ((ctx.row_count !== len) && (fixed === e_FIXED.NEITHER)) {
               set_tr_cnt(ctx, len);
             }
 
 
-            if (len >= 0 && fixed === e_fixed.NEITHER) {
+            if (len >= 0 && fixed === e_FIXED.NEITHER) {
               let offset: number;
               if (tail > len) {
                 offset = tail - len;
@@ -562,7 +583,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               
 
 
-              if (ctx.load_the_trs_once === e_vt_state.INIT) {
+              if (ctx.vt_state === e_VT_STATE.INIT) {
                 /* init trs [0, 1] */
                 for (let i = head; i < tail; ++i) {
                   trs.push(children[i]);
@@ -571,7 +592,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 // reset `prev_row_count` as same as `row_count`
                 ctx.prev_row_count = ctx.row_count;
 
-              } else if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+              } else if (ctx.vt_state === e_VT_STATE.RUNNING) {
 
                 len = ctx.row_count;
                 let prev_len = ctx.prev_row_count;
@@ -679,7 +700,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 }
 
                 if (PSRA[0] === -1) {
-                  // init Shadow Rows, just do `apply_h`.
+                  // init Shadow Rows, just do `add_h`.
                   console.assert(head === 0);
                   srs_diff(ctx, PSRA, 0, head, 0, 0);
                 } else {
@@ -689,10 +710,10 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                 ctx.prev_row_count = ctx.row_count;
               } /* RUNNING */
 
-            } /* len && this.fixed === e_fixed.NEITHER */
+            } /* len && this.fixed === e_FIXED.NEITHER */
 
             /* fixed L R */
-            if (len >= 0 && fixed !== e_fixed.NEITHER) {
+            if (len >= 0 && fixed !== e_FIXED.NEITHER) {
               for (let i = head; i < tail; ++i) {
                 trs.push(children[i]);
               }
@@ -729,7 +750,7 @@ class VTable extends React.Component<VTProps, {
   private wrap_inst: React.RefObject<HTMLDivElement>;
   private scrollTop: number;
   private scrollLeft: number;
-  private fixed: e_fixed;
+  private fixed: e_FIXED;
 
 
   private user_context: obj;
@@ -758,16 +779,16 @@ class VTable extends React.Component<VTProps, {
 
     const fixed = this.props.children[0].props.fixed;
     if (fixed === "left") {
-      this.fixed = e_fixed.L;
+      this.fixed = e_FIXED.L;
     } else if (fixed === "right") {
-      this.fixed = e_fixed.R;
+      this.fixed = e_FIXED.R;
     } else {
-      this.fixed = e_fixed.NEITHER;
+      this.fixed = e_FIXED.NEITHER;
     }
 
 
 
-    if (this.fixed === e_fixed.NEITHER) {
+    if (this.fixed === e_FIXED.NEITHER) {
       this.restoring = false;
 
       this.user_context = {};
@@ -790,8 +811,8 @@ class VTable extends React.Component<VTProps, {
 
 
 
-    if (ctx.load_the_trs_once === e_vt_state.INIT) {
-      if (this.fixed === e_fixed.NEITHER) {
+    if (ctx.vt_state === e_VT_STATE.INIT) {
+      if (this.fixed === e_FIXED.NEITHER) {
 
         ctx.possible_hight_per_tr = -1;
         ctx.computed_h = 0;
@@ -821,11 +842,11 @@ class VTable extends React.Component<VTProps, {
       ctx.WH = 0;
 
     } else {
-      if (this.fixed === e_fixed.NEITHER) {
-        console.assert(ctx.load_the_trs_once === e_vt_state.SUSPENDED);
+      if (this.fixed === e_FIXED.NEITHER) {
+        console.assert(ctx.vt_state === e_VT_STATE.SUSPENDED);
 
         /* `SUSPENDED` -> `WAITING` */
-        ctx.load_the_trs_once = e_vt_state.WAITING;
+        ctx.vt_state = e_VT_STATE.WAITING;
 
         const { state, scrollTop, scrollLeft } = ctx._React_ptr;
         this.state = { head: state.head, top: state.top, tail: state.tail };
@@ -834,7 +855,7 @@ class VTable extends React.Component<VTProps, {
       }
     }
 
-    if (this.fixed === e_fixed.NEITHER) {
+    if (this.fixed === e_FIXED.NEITHER) {
       ctx.VTScroll = this.scroll.bind(this);
       ctx._React_ptr = this;
     }
@@ -865,11 +886,11 @@ class VTable extends React.Component<VTProps, {
 
   public componentDidMount() {
     switch (this.fixed) {
-      case e_fixed.L:
+      case e_FIXED.L:
         {
           /* registers the `_lvt_ctx` at the `ctx`. */
-          store.set(0 - ID, { _React_ptr: this } as VT_CONTEXT);
-          ctx._lvt_ctx = store.get(0 - ID);
+          vt_context.set(0 - ID, { _React_ptr: this } as VT_CONTEXT);
+          ctx._lvt_ctx = vt_context.get(0 - ID);
           ctx._lvt_ctx.wrap_inst = this.wrap_inst;
           _Update_wrap_style(ctx._lvt_ctx, ctx.computed_h);
           const { scrollTop, scrollLeft, state } = ctx._React_ptr;
@@ -883,11 +904,11 @@ class VTable extends React.Component<VTProps, {
         }
         return;
 
-      case e_fixed.R:
+      case e_FIXED.R:
         {
           /* registers the `_rvt_ctx` at the `ctx`. */
-          store.set((1 << 31) + ID, { _React_ptr: this } as VT_CONTEXT);
-          ctx._rvt_ctx = store.get((1 << 31) + ID);
+          vt_context.set((1 << 31) + ID, { _React_ptr: this } as VT_CONTEXT);
+          ctx._rvt_ctx = vt_context.get((1 << 31) + ID);
           ctx._rvt_ctx.wrap_inst = this.wrap_inst;
           _Update_wrap_style(ctx._rvt_ctx, ctx.computed_h);
           const { scrollTop, scrollLeft, state } = ctx._React_ptr;
@@ -913,23 +934,23 @@ class VTable extends React.Component<VTProps, {
     // 0 - head, 2 - body
     const children = this.props.children[2].props.children;
 
-    if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+    if (ctx.vt_state === e_VT_STATE.WAITING) {
       /* switch `SUSPENDED` to `WAITING` from VT's constructor. */
       if (children.length) {
         // just only switch to `RUNNING`.
-        ctx.load_the_trs_once = e_vt_state.RUNNING;
+        ctx.vt_state = e_VT_STATE.RUNNING;
       }
     } else {
       if (children.length) {
-        // `load_the_trs_once` is changed by `VTRow`.
-        console.assert(ctx.load_the_trs_once === e_vt_state.LOADED);
-        ctx.load_the_trs_once = e_vt_state.RUNNING;
+        // `vt_state` is changed by `VTRow`.
+        console.assert(ctx.vt_state === e_VT_STATE.LOADED);
+        ctx.vt_state = e_VT_STATE.RUNNING;
         this.scrollHook({
           target: { scrollTop: 0, scrollLeft: 0 },
           flags: SCROLLEVT_INIT,
         });
       } else {
-        console.assert(ctx.load_the_trs_once === e_vt_state.INIT);
+        console.assert(ctx.vt_state === e_VT_STATE.INIT);
       }
     }
 
@@ -937,15 +958,15 @@ class VTable extends React.Component<VTProps, {
 
   public componentDidUpdate() {
 
-    if (this.fixed !== e_fixed.NEITHER) return;
+    if (this.fixed !== e_FIXED.NEITHER) return;
 
-    if (ctx.load_the_trs_once === e_vt_state.INIT) {
+    if (ctx.vt_state === e_VT_STATE.INIT) {
       return;
     }
 
-    if (ctx.load_the_trs_once === e_vt_state.LOADED) {
+    if (ctx.vt_state === e_VT_STATE.LOADED) {
       // `LOADED` -> `RUNNING`.
-      ctx.load_the_trs_once = e_vt_state.RUNNING;
+      ctx.vt_state = e_VT_STATE.RUNNING;
 
       // force update for initialization
       this.scrollHook({
@@ -954,18 +975,18 @@ class VTable extends React.Component<VTProps, {
       });
     }
 
-    if (ctx.load_the_trs_once === e_vt_state.WAITING) {
+    if (ctx.vt_state === e_VT_STATE.WAITING) {
       // Do you get the previous data back?
       if (this.props.children[2].props.children.length) {
         // Y, `WAITING` -> `RUNNING`.
-        ctx.load_the_trs_once = e_vt_state.RUNNING;
+        ctx.vt_state = e_VT_STATE.RUNNING;
       } else {
         // N, keep `WAITING` then just return.
         return;
       }
     }
 
-    if (ctx.load_the_trs_once === e_vt_state.RUNNING) {
+    if (ctx.vt_state === e_VT_STATE.RUNNING) {
       if (this.restoring) {
         this.restoring = false;
         this.scrollHook({
@@ -986,14 +1007,14 @@ class VTable extends React.Component<VTProps, {
   }
 
   public componentWillUnmount() {
-    if (this.fixed !== e_fixed.NEITHER) return;
+    if (this.fixed !== e_FIXED.NEITHER) return;
 
     if (ctx.destroy) {
-      store.delete(0 - ID);        // fixed left
-      store.delete((1 << 31) + ID);// fixed right
-      store.delete(ID);
+      vt_context.delete(0 - ID);        // fixed left
+      vt_context.delete((1 << 31) + ID);// fixed right
+      vt_context.delete(ID);
     } else {
-      ctx.load_the_trs_once = e_vt_state.SUSPENDED;
+      ctx.vt_state = e_VT_STATE.SUSPENDED;
       const { state, scrollTop, scrollLeft } = ctx._React_ptr;
       ctx._React_ptr = { state, scrollTop, scrollLeft };
     }
@@ -1277,9 +1298,9 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents) {
 }
 
 function init(id: number) {
-  const inside = store.get(id) || {} as VT_CONTEXT;
+  const inside = vt_context.get(id) || {} as VT_CONTEXT;
   if (!inside._vtcomponents) {
-    store.set(id, inside);
+    vt_context.set(id, inside);
     const { VTable, VTWrapper, VTRow, S } = VTContext.Switch(id);
     // set the virtual layer.
     inside._vtcomponents = {
@@ -1300,7 +1321,7 @@ function init(id: number) {
     });
     inside.context = S;
     // start -> `INIT`
-    inside.load_the_trs_once = e_vt_state.INIT;
+    inside.vt_state = e_VT_STATE.INIT;
   }
   return inside;
 }
@@ -1365,5 +1386,5 @@ function getVTComponents(id: number) {
 export
 function VTScroll(id: number, param?: { top: number, left: number }) {
   ASSERT_ID(id);
-  return store.get(id).VTScroll(param);
+  return vt_context.get(id).VTScroll(param);
 }
