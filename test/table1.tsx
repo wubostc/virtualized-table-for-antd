@@ -3,7 +3,7 @@
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Table, Button, Input, Switch, Modal, Checkbox } from 'antd';
-import { VTComponents, VTScroll, } from '../src/index';
+import { VTComponents, VTScroll, } from '../../virtualized-table-for-antd';
 import { isNumber } from 'util';
 
 
@@ -158,7 +158,7 @@ export default function Table1() {
 
 
   // VTComponents
-  const [height, setHeight] = useState();
+  const [height, setHeight] = useState<string | number>(500);
   const [overscanRowCount, setOverscanRowCount] = useState(5);
   const [destroy, setDestroy] = useState(false);
 
@@ -361,8 +361,9 @@ export default function Table1() {
       <br />
       height: 
       <Input style={{ width: 100 }} value={height} onChange={e => {
-        isNumber(+e.target.value) ?
-        setHeight(+e.target.value) : setHeight(void 0);
+        // isNumber(+e.target.value) ?
+        // setHeight(+e.target.value) : setHeight(void 0);
+        setHeight(e.target.value);
       }}></Input><br />
       overscanRowCount: 
       <Input style={{ width: 100 }} value={overscanRowCount}
@@ -380,12 +381,11 @@ export default function Table1() {
         style={{ width: 1200 }}
         columns={columns}
         dataSource={data}
-        scroll={{ y: 700, x: 1600 }}
+        scroll={{ y: height, x: 1600 }}
         components={
           VTComponents(Object.assign({
             id: 1, debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */
           },
-          height ? { height } : null,
           overscanRowCount ? { overscanRowCount } : null))
         }
         pagination={
