@@ -68,7 +68,7 @@ enum e_fixed {
   R
 }
 
-interface storeValue extends vt_opts {
+interface VT_CONTEXT extends vt_opts {
   _y: number; // will use the Table.scroll.y.
   _raw_y: number | string;
 
@@ -90,8 +90,8 @@ interface storeValue extends vt_opts {
 
   _React_ptr: any; // pointer to the instance of `VT`.
 
-  _lvt_ctx: storeValue; // fixed left.
-  _rvt_ctx: storeValue; // fixed right.
+  _lvt_ctx: VT_CONTEXT; // fixed left.
+  _rvt_ctx: VT_CONTEXT; // fixed right.
 
 
   WH: number;      // Wrapped Height.
@@ -117,7 +117,7 @@ interface storeValue extends vt_opts {
   _index_persister: Set<number/* */>;
 }
 
-const store: Map<number, storeValue> = new Map();
+const store: Map<number, VT_CONTEXT> = new Map();
 
 /**
  * THE EVENTS OF SCROLLING.
@@ -175,7 +175,7 @@ const Row = React.forwardRef(function Row(props: any, ref) {
  */
 /** Shadow Rows. */
 function srs_diff(
-  ctx: storeValue, PSR: number[],
+  ctx: VT_CONTEXT, PSR: number[],
   begin: number, end: number, prev_begin: number, prev_end: number) {
 
   const { row_height, possible_hight_per_tr } = ctx;
@@ -207,7 +207,7 @@ function srs_diff(
 }
  
 /** update to ColumnProps.fixed synchronously */
-function _RC_fixed_setState(ctx: storeValue, top: number, head: number, tail: number) {
+function _RC_fixed_setState(ctx: VT_CONTEXT, top: number, head: number, tail: number) {
   if (ctx._lvt_ctx)
     ctx._lvt_ctx._React_ptr.setState({ top, head, tail });
   if (ctx._rvt_ctx)
@@ -215,7 +215,7 @@ function _RC_fixed_setState(ctx: storeValue, top: number, head: number, tail: nu
 }
 
 
-function _Update_wrap_style(ctx: storeValue, h: number) {
+function _Update_wrap_style(ctx: VT_CONTEXT, h: number) {
   // a component has unmounted.
   if (!ctx.wrap_inst.current) return;
 
@@ -226,7 +226,7 @@ function _Update_wrap_style(ctx: storeValue, h: number) {
 
 
 /** non-block, just create a macro tack, then only update once. */
-function update_wrap_style(ctx: storeValue, h: number) {
+function update_wrap_style(ctx: VT_CONTEXT, h: number) {
   if (ctx.WH === h) return;
   ctx.WH = h;
   _Update_wrap_style(ctx, h);
@@ -236,7 +236,7 @@ function update_wrap_style(ctx: storeValue, h: number) {
 }
 
 
-function _scroll_to(ctx: storeValue, top: number, left: number) {
+function _scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
   const ele = ctx.wrap_inst.current.parentElement;
   /** ie */
   ele.scrollTop = top;
@@ -244,7 +244,7 @@ function _scroll_to(ctx: storeValue, top: number, left: number) {
 }
 
 
-function scroll_to(ctx: storeValue, top: number, left: number) {
+function scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
   _scroll_to(ctx, top, left);
 
   if (ctx._lvt_ctx) _scroll_to(ctx._lvt_ctx, top, left);
@@ -255,20 +255,20 @@ function scroll_to(ctx: storeValue, top: number, left: number) {
 /**
  * running level: `RUNNING`.
  */
-function apply_h(ctx: storeValue, idx: number, h: number) {
+function apply_h(ctx: VT_CONTEXT, idx: number, h: number) {
   console.assert(!isNaN(h), `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
 }
 
 
-function free_h_tr(ctx: storeValue, idx: number) {
+function free_h_tr(ctx: VT_CONTEXT, idx: number) {
   console.assert(!isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
 }
 
 
-function _repainting(ctx: storeValue) {
+function _repainting(ctx: VT_CONTEXT) {
   return requestAnimationFrame(() => {
     const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_SFREE } = ctx;
     
@@ -327,7 +327,7 @@ function _repainting(ctx: storeValue) {
 
 
 /** non-block */
-function repainting_with_add(ctx: storeValue, idx: number, tr: HTMLTableRowElement) {
+function repainting_with_add(ctx: VT_CONTEXT, idx: number, tr: HTMLTableRowElement) {
   ctx.PAINT_ADD.set(idx, tr);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
@@ -335,7 +335,7 @@ function repainting_with_add(ctx: storeValue, idx: number, tr: HTMLTableRowEleme
 
 
 /** non-block */
-function repainting_with_sadd(ctx: storeValue, idx: number, h: number) {
+function repainting_with_sadd(ctx: VT_CONTEXT, idx: number, h: number) {
   ctx.PAINT_SADD.set(idx, h);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
@@ -343,21 +343,21 @@ function repainting_with_sadd(ctx: storeValue, idx: number, h: number) {
 
 
 /** non-block */
-function repainting_with_free(ctx: storeValue, idx: number) {
+function repainting_with_free(ctx: VT_CONTEXT, idx: number) {
   ctx.PAINT_FREE.add(idx);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
 }
 
 /** non-block */
-function repainting_with_sfree(ctx: storeValue, idx: number) {
+function repainting_with_sfree(ctx: VT_CONTEXT, idx: number) {
   ctx.PAINT_SFREE.add(idx);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
 }
 
 /* overload __DIAGNOSIS__. */
-function __DIAGNOSIS__(ctx: storeValue) {
+function __DIAGNOSIS__(ctx: VT_CONTEXT) {
   Object.defineProperty(ctx, "__DIAGNOSIS__", {
     get() {
       console.debug("OoOoOoO DIAGNOSIS OoOoOoO");
@@ -373,7 +373,7 @@ function __DIAGNOSIS__(ctx: storeValue) {
   });
 }
 
-function log_debug(ctx: storeValue & obj, msg: string) {
+function log_debug(ctx: VT_CONTEXT & obj, msg: string) {
   if (ctx.debug) {
     ctx = { ...ctx };
     __DIAGNOSIS__(ctx);
@@ -383,16 +383,16 @@ function log_debug(ctx: storeValue & obj, msg: string) {
 }
 
 
-function set_tr_cnt(ctx: storeValue, n: number) {
+function set_tr_cnt(ctx: VT_CONTEXT, n: number) {
   ctx.re_computed = n - ctx.row_count;
   ctx.prev_row_count = ctx.row_count;
   ctx.row_count = n;
 }
 
-class VT_CONTEXT {
+const VTContext = {
 
 // using closure
-public static Switch(ID: number) {
+Switch(ID: number) {
 
 const ctx = store.get(ID);
 
@@ -719,7 +719,7 @@ type VTProps = {
   style: React.CSSProperties;
 } & obj;
 
-class VT extends React.Component<VTProps, {
+class VTable extends React.Component<VTProps, {
   top: number;
   head: number;
   tail: number;
@@ -868,7 +868,7 @@ class VT extends React.Component<VTProps, {
       case e_fixed.L:
         {
           /* registers the `_lvt_ctx` at the `ctx`. */
-          store.set(0 - ID, { _React_ptr: this } as storeValue);
+          store.set(0 - ID, { _React_ptr: this } as VT_CONTEXT);
           ctx._lvt_ctx = store.get(0 - ID);
           ctx._lvt_ctx.wrap_inst = this.wrap_inst;
           _Update_wrap_style(ctx._lvt_ctx, ctx.computed_h);
@@ -886,7 +886,7 @@ class VT extends React.Component<VTProps, {
       case e_fixed.R:
         {
           /* registers the `_rvt_ctx` at the `ctx`. */
-          store.set((1 << 31) + ID, { _React_ptr: this } as storeValue);
+          store.set((1 << 31) + ID, { _React_ptr: this } as VT_CONTEXT);
           ctx._rvt_ctx = store.get((1 << 31) + ID);
           ctx._rvt_ctx.wrap_inst = this.wrap_inst;
           _Update_wrap_style(ctx._rvt_ctx, ctx.computed_h);
@@ -1251,17 +1251,17 @@ class VT extends React.Component<VTProps, {
 }
 
 
-return { VT, VTWrapper, VTRow, S };
+return { VTable, VTWrapper, VTRow, S };
 
-} // Switch
+} // _context
 
-} // VT_CONTEXT
+} // VT
 
 function ASSERT_ID(id: number) {
   console.assert(typeof id === "number" && id > 0);
 }
 
-function _set_components(ctx: storeValue, components: TableComponents) {
+function _set_components(ctx: VT_CONTEXT, components: TableComponents) {
   const { table, body, header } = components;
   ctx.components.body = { ...ctx.components.body, ...body };
   if (body && body.cell) {
@@ -1277,13 +1277,13 @@ function _set_components(ctx: storeValue, components: TableComponents) {
 }
 
 function init(id: number) {
-  const inside = store.get(id) || {} as storeValue;
+  const inside = store.get(id) || {} as VT_CONTEXT;
   if (!inside._vtcomponents) {
     store.set(id, inside);
-    const { VT, VTWrapper, VTRow, S } = VT_CONTEXT.Switch(id);
+    const { VTable, VTWrapper, VTRow, S } = VTContext.Switch(id);
     // set the virtual layer.
     inside._vtcomponents = {
-      table: VT,
+      table: VTable,
       body: {
         wrapper: VTWrapper,
         row: VTRow,
@@ -1331,7 +1331,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
       overscanRowCount: 5,
       debug: false,
       destroy: false,
-    } as storeValue,
+    } as VT_CONTEXT,
     vt_opts);
 
   if (vt_opts.debug) {
