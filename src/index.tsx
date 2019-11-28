@@ -69,7 +69,8 @@ enum e_fixed {
 }
 
 interface storeValue extends vt_opts {
-  height: number; // will use the Table.scroll.y if unset.
+  _y: number; // will use the Table.scroll.y.
+  _raw_y: number | string;
 
   _vtcomponents: TableComponents; // virtual layer.
   components: TableComponents;    // implementation layer.
@@ -277,28 +278,32 @@ function _repainting(ctx: storeValue) {
       for (let idx of PAINT_FREE) {
         free_h_tr(ctx, idx);
       }
-      console.assert(!isNaN(ctx.computed_h) && ctx.computed_h >= 0);
+      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h >= 0);
     }
 
     if (PAINT_SFREE.size) {
       for (let idx of PAINT_SFREE) {
         free_h_tr(ctx, idx);
       }
-      console.assert(!isNaN(ctx.computed_h) && ctx.computed_h >= 0);
+      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h >= 0);
     }
 
     if (PAINT_ADD.size) {
       for (let [idx, el] of PAINT_ADD) {
         apply_h(ctx, idx, el.offsetHeight);
       }
-      console.assert(!isNaN(ctx.computed_h) && ctx.computed_h >= 0);
+      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h >= 0);
     }
 
     if (PAINT_SADD.size) {
       for (let [idx, h] of PAINT_SADD) {
         apply_h(ctx, idx, h);
       }
-      console.assert(!isNaN(ctx.computed_h) && ctx.computed_h >= 0);
+      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h >= 0);
     }
 
 
@@ -1001,32 +1006,35 @@ class VT extends React.Component<VTProps, {
 
   private scroll_with_computed(top: number) {
 
-    let {
+    const {
       row_height,
       row_count,
-      height,
       possible_hight_per_tr,
-      overscanRowCount
+      overscanRowCount,
     } = ctx;
 
     let overscan = overscanRowCount;
 
-    if (!height) {
-      const props = this.props.children[2].props.children[0].props;
-      try {
-        if (typeof props.scroll.y === "undefined") {
-          console.warn("VT will not works well, did you forget to set `scroll.y`?");
-          ctx.height = this.wrap_inst.current.parentElement.offsetHeight;
-        } else if (typeof props.scroll.y === "number") {
-          ctx.height = props.scroll.y;
-        } else {
-          ctx.height = this.wrap_inst.current.parentElement.offsetHeight;
-        }
-        height = ctx.height;
-      } catch {
-        console.assert(false);
-      }
+    const props = this.props.children[2].props.children[0].props;
+
+    if (typeof props.scroll.y === "number") {
+      ctx._raw_y = props.scroll.y as number;
+      ctx._y = ctx._raw_y;
+    } else if (typeof props.scroll.y === "string") {
+      /* a string, like "calc(100vh - 300px)" */
+      if (ctx.debug)
+        console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+      ctx._raw_y = props.scroll.y;
+      ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
+    } else {
+      if (ctx.debug)
+        console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+      console.info("VT will not works well, did you forget to set `scroll.y`?");
+      ctx._raw_y = null;
+      ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
     }
+
+    console.assert(ctx._y >= 0);
 
     let accumulate_top = 0, i = 0;
     for (; i < row_count; ++i) {
@@ -1044,7 +1052,7 @@ class VT extends React.Component<VTProps, {
 
     let torender_h = 0, j = i;
     for (; j < row_count; ++j) {
-      if (torender_h > height) break;
+      if (torender_h > ctx._y) break;
       torender_h += (row_height[j] || possible_hight_per_tr);
     }
 
