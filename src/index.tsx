@@ -1036,32 +1036,27 @@ class VT extends React.Component<VTProps, {
 
     console.assert(ctx._y >= 0);
 
+    // to calc `accumulate_top` with `row_height` and `overscan`.
     let accumulate_top = 0, i = 0;
-    for (; i < row_count; ++i) {
-      if (accumulate_top > top) break;
-      accumulate_top += (row_height[i] || possible_hight_per_tr);
+    for (; i < row_count && accumulate_top <= top; ++i) {
+      accumulate_top += row_height[i];
     }
 
-    if (i > 0) {
-      do {
-        accumulate_top -= (row_height[--i] || possible_hight_per_tr);
-      } while (overscan-- && i);
+    while (i > 0 && overscan--) {
+      accumulate_top -= row_height[--i];
     }
 
-    overscan = overscanRowCount * 2;
-
+    // the height to render.
     let torender_h = 0, j = i;
-    for (; j < row_count; ++j) {
-      if (torender_h > ctx._y) break;
-      torender_h += (row_height[j] || possible_hight_per_tr);
+    for (; j < row_count && torender_h < ctx._y; ++j) {
+      torender_h += Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[j];
     }
 
-    if (j < row_count) {
-      do {
-        torender_h += (row_height[j++] || possible_hight_per_tr);
-      } while ((--overscan > 0) && (j < row_count));
-    }
+    j += overscanRowCount * 2;
 
+    if (j > row_count) j = row_count;
+
+    // returns [head, tail, top].
     return [0 | i, 0 | j, 0 | accumulate_top];
   }
 
