@@ -1036,23 +1036,28 @@ class VTable extends React.Component<VTProps, {
 
     let overscan = overscanRowCount;
 
-    const props = this.props.children[2].props.children[0].props;
+    try {
+      const props = this.props.children[2].props.children[0].props;
 
-    if (typeof props.scroll.y === "number") {
-      ctx._raw_y = props.scroll.y as number;
-      ctx._y = ctx._raw_y;
-    } else if (typeof props.scroll.y === "string") {
-      /* a string, like "calc(100vh - 300px)" */
-      if (ctx.debug)
-        console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
-      ctx._raw_y = props.scroll.y;
-      ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
-    } else {
-      if (ctx.debug)
-        console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
-      console.info("VT will not works well, did you forget to set `scroll.y`?");
-      ctx._raw_y = null;
-      ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
+      if (typeof props.scroll.y === "number") {
+        ctx._raw_y = props.scroll.y as number;
+        ctx._y = ctx._raw_y;
+      } else if (typeof props.scroll.y === "string") {
+        /* a string, like "calc(100vh - 300px)" */
+        if (ctx.debug)
+          console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+        ctx._raw_y = props.scroll.y;
+        ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
+      } else {
+        if (ctx.debug)
+          console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+        console.info("VT will not works well, did you forget to set `scroll.y`?");
+        ctx._raw_y = null;
+        ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
+      }
+    } catch {
+      // return it if there is no children.
+      return [0 | 0, 0 | 0, 0 | 0];
     }
 
     console.assert(ctx._y >= 0);
