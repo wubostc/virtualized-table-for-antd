@@ -17,7 +17,7 @@ export default function Table1({ ctx }: { ctx: any} ) {
     for (let i = 0; i < 970; i++) {
       const n = 0 | Math.random() * 3000 + 1000;
       data.push({
-        key: i + n,
+        key: i,
         name: `Edrward ${n}`,
         age: 0 | Math.random() * 88 + 12,
         address: (`London Park no. ${n}`),
