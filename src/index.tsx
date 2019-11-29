@@ -1367,8 +1367,12 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   return inside._vtcomponents;
 }
 
+/**
+ * @deprecated 
+ */
 export
 function getVTContext(id: number) {
+  console.warn("This function will be deprecated in the next release.");
   ASSERT_ID(id);
   return init(id).context;
 }

@@ -29,7 +29,7 @@
 
   /* all APIs */
   export declare function VTComponents(vt_opts: vt_opts): TableComponents;
-  export declare function getVTContext(id: number): React.Context<vt_ctx>;
+  export declare function getVTContext(id: number): React.Context<vt_ctx>; /** @deprecated */
   export declare function setComponents(id: number, components: TableComponents): void;
   export declare function getVTComponents(id: number): TableComponents; /** @deprecated */
   export declare function VTScroll(id: number, param?: {
