@@ -18,6 +18,27 @@ function rndstr(str: string) {
 
 export default function Table1() {
   
+
+  const myajax = useCallback(() => {
+    const data: any[] = [];
+    for (let i = 0; i < 970; i++) {
+      const n = 0 | Math.random() * 3000 + 1000;
+      data.push({
+        key: i + n,
+        name: `Edrward ${n}`,
+        age: 0 | Math.random() * 88 + 12,
+        address: rndstr(`London Park no. ${n}`),
+      });
+    }
+
+    return new Promise<any[]>((resolve, reject) => {
+      setTimeout(() => {
+        resolve(data);
+      }, Math.random() * 200 + 100);
+    });
+  }, []);
+
+
   const _data = useMemo(() => {
     const data: any[] = [];
     for (let i = 0; i < 1000; i++) {
@@ -166,9 +187,12 @@ export default function Table1() {
     <>
       <Button onClick={() => setData([])}>{"clear data"}</Button>
       <Button onClick={() => setData(_data)}>{"load data"}</Button>
+      <Button onClick={async () => setData(await myajax())}>{"load data(ajax)"}</Button>
       
-
-      pagination:
+      <br />
+      <br />
+      ---- pagination ----
+      <br />
       <Button onClick={() => {
         if (showPagination) {
           setPagination(false);
