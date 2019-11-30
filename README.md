@@ -17,13 +17,29 @@
   // the param of the func VTComponents
   interface vt_opts extends Object {
       readonly id: number;
-      overscanRowCount?: number; // default 5
-      reflection?: string[] | string; /** @deprecated */
-      onScroll?: ({ left, top }: {
+      /**
+       * @default 5
+      */
+      overscanRowCount?: number;
+      /**
+       * @deprecated
+      */
+      reflection?: string[] | string;
+      /**
+       * wheel event(only works on native events).
+      */
+      onScroll?: ({ left, top, isEnd, }: {
           top: number;
           left: number;
+          isEnd: boolean;
       }) => void;
-      destroy?: boolean; // default false
+      /**
+       * @default false
+      */
+      destroy?: boolean;
+      /**
+       * @default false
+      */
       debug?: boolean;
   }
 
