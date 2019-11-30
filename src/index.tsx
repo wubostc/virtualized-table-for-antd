@@ -42,7 +42,11 @@ interface vt_opts extends Object {
    */
   reflection?: string[] | string;
 
-  onScroll?: ({ left, top }: { top: number, left: number }) => void;
+  /**
+   * wheel event(only works on native events).
+   */
+  onScroll?: ({ left, top, isEnd, }:
+    { top: number, left: number, isEnd: boolean }) => void;
 
   /**
    * @default false
@@ -151,16 +155,22 @@ const SCROLLEVT_NATIVE     = (1<<3);
 const SCROLLEVT_BARRIER    = (1<<4); // It only for `SCROLLEVT_RECOMPUTE`.
 const SCROLLEVT_MASK       = SCROLLEVT_BARRIER | SCROLLEVT_RECOMPUTE;
 
-type SimEvent = { target: { scrollTop: number, scrollLeft: number }, flags: number };
+type SimEvent = {
+  target: { scrollTop: number, scrollLeft: number };
+  flags: number;
+  endOfElements?: boolean;
+};
 
 // the factory function returns a SimEvent.
-function _make_evt(ne:　Event): SimEvent {
+function _make_evt(ne: Event): SimEvent {
+  const target: any = ne.target;
   return {
     target: {
-      scrollTop: (ne.target as any).scrollTop,
-      scrollLeft: (ne.target as any).scrollLeft,
+      scrollTop: target.scrollTop,
+      scrollLeft: target.scrollLeft,
     },
-    flags: SCROLLEVT_NATIVE
+    endOfElements: target.scrollHeight - target.clientHeight === target.scrollTop,
+    flags: SCROLLEVT_NATIVE,
   };
 }
 
@@ -1135,10 +1145,6 @@ class VTable extends React.Component<VTProps, {
     let scrollLeft = e.target.scrollLeft;
     let flags = e.flags;
 
-    if (ctx.onScroll && (flags & SCROLLEVT_NATIVE)) {
-      ctx.onScroll({ top: scrollTop, left: scrollLeft });
-    }
-
     if (ctx.debug) {
       console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollLeft);
     }
@@ -1223,16 +1229,27 @@ class VTable extends React.Component<VTProps, {
       this.scrollLeft = scrollLeft;
       this.scrollTop = scrollTop;
 
+      const _cb_scroll = () => {
+        if (ctx.onScroll) {
+          ctx.onScroll({
+            top: scrollTop,
+            left: scrollLeft,
+            isEnd: e.endOfElements,
+          });
+        }
+      }
+
       if (head === prev_head && tail === prev_tail && top === prev_top) {
         this.HNDID_RAF = 0;
-
         flags &= ~SCROLLEVT_NATIVE;
+        _cb_scroll();
         return;
       }
 
       this.setState({ top, head, tail }, () => {
         this.HNDID_RAF = 0;
         flags &= ~SCROLLEVT_NATIVE;
+        _cb_scroll();
       });
 
       _RC_fixed_setState(ctx, top, head, tail);
