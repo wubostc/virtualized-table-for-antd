@@ -143,7 +143,7 @@ interface VT_CONTEXT extends vt_opts {
 /**
  * @global
  */
-const vt_context: Map<number, VT_CONTEXT> = new Map();
+export const vt_context: Map<number, VT_CONTEXT> = new Map();
 
 /**
  * THE EVENTS OF SCROLLING.
