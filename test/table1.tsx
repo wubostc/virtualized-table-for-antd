@@ -385,9 +385,7 @@ export default function Table1() {
       <br />
       height: 
       <Input style={{ width: 100 }} value={height} onChange={e => {
-        // isNumber(+e.target.value) ?
-        // setHeight(+e.target.value) : setHeight(void 0);
-        setHeight(e.target.value);
+        setHeight(Number.isNaN(+e.target.value) ? e.target.value : +e.target.value);
       }}></Input><br />
       overscanRowCount: 
       <Input style={{ width: 100 }} value={overscanRowCount}
