@@ -10,7 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 
 import React, { useRef, useMemo, } from "react";
-import { VTComponents, VTScroll, setComponents, vt_opts, vt_context } from "./index";
+import { VTComponents, VTScroll, setComponents, vt_opts, vt_context } from "./vt";
 import { TableComponents } from "antd/lib/table/interface";
 
 /**
@@ -59,7 +59,13 @@ export type vt_opts_t = Omit<vt_opts, "id" | "reflection">;
  * );
  * }
  */
-export function useVT(opts: vt_opts_t) {
+export function useVT(opts: vt_opts_t): [TableComponents,
+                                        (components: TableComponents) => void,
+                                        (param?: { top: number; left: number; }) => {
+                                          top: number;
+                                          left: number;
+                                        }]
+{
 
   const _id = init_once(_generateID);
   const _lamda_scroll = init_once(() => (param?: { top: number; left: number; }) => VTScroll(_id, param));
