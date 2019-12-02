@@ -313,7 +313,7 @@ function _repainting(ctx: VT_CONTEXT) {
         free_h(ctx, idx);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
-      if (ctx.computed_h < 0) ctx.computed_h = 0;
+      console.assert(ctx.computed_h >= 0);
     }
 
     if (PAINT_SFREE.size) {
@@ -321,7 +321,7 @@ function _repainting(ctx: VT_CONTEXT) {
         free_h(ctx, idx);
       }
       console.assert(!Number.isNaN(ctx.computed_h));
-      if (ctx.computed_h < 0) ctx.computed_h = 0;
+      console.assert(ctx.computed_h >= 0);
     }
 
     if (PAINT_ADD.size) {
