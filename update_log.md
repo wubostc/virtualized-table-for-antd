@@ -1,3 +1,8 @@
+## 0.6.3
+  1. fix some bugs.(#21)
+
+
+
 ## 0.6.2
   1. an unmounted component will not update style.
   1. fix a bug.(#25)
