@@ -74,5 +74,5 @@ export function useVT(opts: vt_opts_t): [TableComponents,
   const _lamda_scroll = init_once(() => (param?: { top: number; left: number; }) => VTScroll(_id, param));
   const _lamda_set = init_once(() => (components: TableComponents) => setComponents(_id, components));
 
-  return [VTComponents({ ...opts, id: _id }), _lamda_set, _lamda_scroll];
+  return [VTComponents({ ...opts, id: _id, destroy: true }), _lamda_set, _lamda_scroll];
 }
