@@ -50,6 +50,7 @@ interface vt_opts extends Object {
     { top: number, left: number, isEnd: boolean }) => void;
 
   /**
+   * @summary it can help you to optimize your next rendering.
    * @default false
    */
   destroy?: boolean;
