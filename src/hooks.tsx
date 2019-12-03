@@ -32,7 +32,10 @@ function init_once<T, U>(factory: (...args: U[]) => T, ...args: U[]) {
   return memo;
 }
 
-export type vt_opts_t = Omit<vt_opts, "id" | "reflection">;
+/**
+ * `destroy` is invalid within Hooks.
+ */
+export type vt_opts_t = Omit<vt_opts, "id" | "reflection" | "destroy">;
 
 
 /**
