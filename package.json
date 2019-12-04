@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "The virtualized table component for ant design, using typescript.",
   "keywords": [
     "antd",
@@ -17,7 +17,7 @@
     "table"
   ],
   "main": "lib/index.js",
-  "module": "es/index.js",
+  "module": "lib/index.js",
   "files": [
     "es",
     "lib"
@@ -51,11 +51,9 @@
     "rimraf": "^2.6.2",
     "typescript": "^3.7.2"
   },
-  "peerDependencies": {
+  "dependencies": {
+    "antd": "^3.13.6",
     "react": "^16.0.0",
     "react-dom": "^16.0.0"
-  },
-  "dependencies": {
-    "antd": "^3.13.6"
   }
 }
