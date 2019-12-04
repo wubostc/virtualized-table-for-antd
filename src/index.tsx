@@ -220,14 +220,14 @@ function srs_diff(
   } else if (begin < prev_begin) {
     for (let i = begin; i < prev_begin; ++i) {
       repainting_with_sadd(ctx, i,
-        Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+        isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
     }
   }
 
   if (end > prev_end) {
     for (let i = prev_end; i < end; ++i) {
       repainting_with_sadd(ctx, i,
-        Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+        isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
     }
   } else if (end < prev_end) {
     for (let i = end; i < prev_end; ++i) {
@@ -288,7 +288,7 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number) {
 
 
 function add_h(ctx: VT_CONTEXT, idx: number, h: number) {
-  console.assert(!Number.isNaN(h), `failed to apply height with index ${idx}!`);
+  console.assert(!isNaN(h), `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
   if (ctx.debug) console.log("add", idx, h);
@@ -296,7 +296,7 @@ function add_h(ctx: VT_CONTEXT, idx: number, h: number) {
 
 
 function free_h(ctx: VT_CONTEXT, idx: number) {
-  console.assert(!Number.isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
+  console.assert(!isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
   if (ctx.debug) console.log("free", idx, ctx.row_height[idx]);
 }
