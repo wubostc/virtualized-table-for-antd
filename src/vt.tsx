@@ -276,7 +276,7 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 
 
 function add_h(ctx: VT_CONTEXT, idx: number, h: number): void {
-  console.assert(!Number.isNaN(h), `failed to apply height with index ${idx}!`);
+  console.assert(h !== void 0, `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
   if (ctx.debug) console.info("add", idx, h);
@@ -284,7 +284,7 @@ function add_h(ctx: VT_CONTEXT, idx: number, h: number): void {
 
 
 function free_h(ctx: VT_CONTEXT, idx: number): void {
-  console.assert(!Number.isNaN(ctx.row_height[idx]), `failed to free this tr[${idx}].`);
+  console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
   if (ctx.debug) console.info("free", idx, ctx.row_height[idx]);
 }
@@ -300,7 +300,7 @@ function _repainting(ctx: VT_CONTEXT): number {
       for (const idx of PAINT_FREE) {
         free_h(ctx, idx);
       }
-      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
     }
 
@@ -308,7 +308,7 @@ function _repainting(ctx: VT_CONTEXT): number {
       for (const idx of PAINT_SFREE) {
         free_h(ctx, idx);
       }
-      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
     }
 
@@ -316,7 +316,7 @@ function _repainting(ctx: VT_CONTEXT): number {
       for (const [idx, el] of PAINT_ADD) {
         add_h(ctx, idx, el.offsetHeight);
       }
-      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
     }
 
@@ -324,7 +324,7 @@ function _repainting(ctx: VT_CONTEXT): number {
       for (const [idx, h] of PAINT_SADD) {
         add_h(ctx, idx, h);
       }
-      console.assert(!Number.isNaN(ctx.computed_h));
+      console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
     }
 
@@ -393,14 +393,14 @@ function srs_diff(
   } else if (begin < prev_begin) {
     for (let i = begin; i < prev_begin; ++i) {
       repainting_with_sadd(ctx, i,
-        Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+        (row_height[i] === void 0) ? possible_hight_per_tr : row_height[i]);
     }
   }
 
   if (end > prev_end) {
     for (let i = prev_end; i < end; ++i) {
       repainting_with_sadd(ctx, i,
-        Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[i]);
+        (row_height[i] === void 0) ? possible_hight_per_tr : row_height[i]);
     }
   } else if (end < prev_end) {
     for (let i = end; i < prev_end; ++i) {
@@ -1085,7 +1085,7 @@ class VTable extends React.Component<VTProps, {
     // the height to render.
     let torender_h = 0, j = i;
     for (; j < row_count && torender_h < ctx._y; ++j) {
-      torender_h += Number.isNaN(row_height[i]) ? possible_hight_per_tr : row_height[j];
+      torender_h += (row_height[i] === void 0) ? possible_hight_per_tr : row_height[j];
     }
 
     j += overscanRowCount * 2;
