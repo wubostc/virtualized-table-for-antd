@@ -16,7 +16,7 @@ import { TableComponents } from "antd/lib/table/interface";
 /**
  * @private functions
  */
-function _generateID() {
+function _generate_id(): number {
   do {
     const id = 0 | Math.random() * (Math.pow(2, 31) - 1);
     if (!vt_context.has(id)) return id;
@@ -26,10 +26,9 @@ function _generateID() {
 /**
  * @private functions
  */
-function init_once<T, U>(factory: (...args: U[]) => T, ...args: U[]) {
+function init_once<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
   const ref = useRef(null);
-  const memo = useMemo(() => factory(...args), [ref.current]);
-  return memo;
+  return useMemo(() => factory(...args), [ref.current]);
 }
 
 /**
@@ -64,14 +63,14 @@ export type vt_opts_t = Omit<vt_opts, "id" | "reflection" | "destroy">;
  */
 export function useVT(opts: vt_opts_t): [TableComponents,
                                         (components: TableComponents) => void,
-                                        (param?: { top: number; left: number; }) => {
+                                        (param?: { top: number; left: number }) => {
                                           top: number;
                                           left: number;
                                         }]
 {
 
-  const _id = init_once(_generateID);
-  const _lambda_scroll = init_once(() => (param?: { top: number; left: number; }) => VTScroll(_id, param));
+  const _id = init_once(_generate_id);
+  const _lambda_scroll = init_once(() => (param?: { top: number; left: number }) => VTScroll(_id, param));
   const _lambda_set = init_once(() => (components: TableComponents) => setComponents(_id, components));
 
   return [VTComponents({ ...opts, id: _id, destroy: true }), _lambda_set, _lambda_scroll];

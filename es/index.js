@@ -1,3 +1,4 @@
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
 /*
 The MIT License (MIT)
@@ -8,19 +9,16 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
-
-
-const _brower = 1;
-const _node = 2;
+var _brower = 1;
+var _node = 2;
 
 (function () {
-  const env = typeof window === 'object' && window instanceof Window ? _brower : _node;
+  var env = (typeof window === "undefined" ? "undefined" : _typeof(window)) === 'object' && window instanceof Window ? _brower : _node;
+
   if (env & _brower) {
-      if (!Object.hasOwnProperty.call(window, "requestAnimationFrame"))
-        throw new Error("Please using the modern browers or appropriate polyfill!");
+    if (!Object.hasOwnProperty.call(window, "requestAnimationFrame")) throw new Error("Please using the modern browers or appropriate polyfill!");
   }
 })();
-
 
 export { VTComponents, VTScroll, setComponents } from "./vt";
 export { useVT } from "./hooks";
