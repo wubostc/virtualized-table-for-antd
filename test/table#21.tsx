@@ -80,12 +80,12 @@ export default function Table21() {
   ], []);
 
 
-  const _data = useMemo(() => {
+  const _data1 = useMemo(() => {
     const data: any[] = [];
     for (let i = 0; i < 83; i++) {
       data.push({
-        key: `#21-${i}`,
-        name: `Edrward ${i}`,
+        key: `#21a-${i}`,
+        name: `Human ${i}`,
         age: 0 | Math.random() * 88 + 12,
         address: rndstr(`London Park no. ${i}`),
       });
@@ -93,7 +93,33 @@ export default function Table21() {
     return data;
   }, []);
 
-  const [data, setData] = useState(_data);
+  const _data2 = useMemo(() => {
+    const data: any[] = [];
+    for (let i = 0; i < 83; i++) {
+      data.push({
+        key: `#21b-${i}`,
+        name: `Alien ${i}`,
+        age: 0 | Math.random() * 88 + 12,
+        address: rndstr(`London Park no. ${i}`),
+      });
+    }
+    return data;
+  }, []);
+
+  const _data3 = useMemo(() => {
+    const data: any[] = [];
+    for (let i = 0; i < 83; i++) {
+      data.push({
+        key: `#21c-${i}`,
+        name: `Magician ${i}`,
+        age: 0 | Math.random() * 88 + 12,
+        address: rndstr(`London Park no. ${i}`),
+      });
+    }
+    return data;
+  }, []);
+
+  const [data, setData] = useState([]);
 
   // Pagination
   const [showPagination, setPagination] = useState(true);
@@ -101,8 +127,14 @@ export default function Table21() {
   return (
     <>
       <Button onClick={() => {
-        setData(_data);
-      }}>{"load data"}</Button>
+        setData(_data1);
+      }}>{"Human"}</Button>
+      <Button onClick={() => {
+        setData(_data2);
+      }}>{"Alien"}</Button>
+      <Button onClick={() => {
+        setData(_data3);
+      }}>{"Magician"}</Button>
       <Button onClick={async () => {
         setData([]);
       }}>{"clear data"}</Button>

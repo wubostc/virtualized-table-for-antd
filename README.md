@@ -11,7 +11,7 @@
   npm i --save virtualizedtableforantd
   ```
 
-+ All interfaces
++ All interfaces([hooks](#hooks) added in v0.7.x)
   ```typescript
 
   // the param of the func VTComponents
@@ -263,6 +263,29 @@
   ```
 
 
+<a id="hooks"></a>
+
++ Hooks APIs(new)
+  ```typescript
+  
+  function MyTable() {
+    const [
+      VT,
+      setComponents, // no longer needs the param id.
+      VTScroll,      // no longer needs the param id.
+      ] = useVT(/*the same as `vt_opts`, but no longer needs the param id. */);
+
+    return (
+      <Table
+        scroll={{ y: 500 }}
+        components={VT}
+        columns={/*your columns*/}
+        dataSource={/*your data*/}
+      />
+    );
+  }
+
+  ```
 
 ## enjoy!
 

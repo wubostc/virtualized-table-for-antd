@@ -1,3 +1,8 @@
+## 0.7.0
+  1. add a new Hooks API, `useVT`.
+  1. fix a bug that free the same index repeatedly.(#21)
+
+
 ## 0.6.3~0.6.4
   1. fix some bugs.(#21)
 

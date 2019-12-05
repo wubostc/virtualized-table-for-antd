@@ -1,6 +1,11 @@
 {
-  "parser": "babel-eslint",
-  "extends": ["eslint:recommended"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
   "parserOptions": {
     "ecmaVersion": 2018,
     "sourceType": "module"
@@ -14,16 +19,18 @@
     "commonjs": true
   },
   "rules": {
-    "no-extra-boolean-cast": "off",
-    "no-console": ["warn", { "allow": ["assert", "warn", "error", "debug", "info"]}],
-    "keyword-spacing": ["error"],
-    "space-before-blocks": ["error"],
-    "quotes": ["error", "double"],
-    "no-unused-vars": ["warn", { "vars": "all", "args": "none", "ignoreRestSiblings": true, "caughtErrors": "none" }],
-    "eqeqeq": ["warn", "always"],
-    "default-case": "error",
-    "semi": ["error", "always", { "omitLastInOneLineBlock": true }],
-    "no-useless-escape": "off"
+    "camelcase": "off",
+    "@typescript-eslint/camelcase": "off",
+    "no-console": ["error", { "allow": ["debug", "warn", "assert", "info"] }],
+    "@typescript-eslint/class-name-casing": "off",
+    "no-constant-condition": "off",
+    "@typescript-eslint/explicit-function-return-type": ["warn", { "allowExpressions": true, "allowTypedFunctionExpressions": false, "allowHigherOrderFunctions": false }],
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "vars": "all",
+      "args": "none",
+      "ignoreRestSiblings": true
+    }]
   },
   "root": true
 }
