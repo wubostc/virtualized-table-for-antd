@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "The virtualized table component for ant design, using typescript.",
   "keywords": [
     "antd",
@@ -17,7 +17,7 @@
     "table"
   ],
   "main": "lib/index.js",
-  "module": "lib/index.js",
+  "module": "es/index.js",
   "files": [
     "es",
     "lib"
