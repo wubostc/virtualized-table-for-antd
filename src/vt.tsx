@@ -350,6 +350,8 @@ function _repainting(ctx: VT_CONTEXT): number {
 
 /** non-block */
 function repainting_with_add(ctx: VT_CONTEXT, idx: number, tr: HTMLTableRowElement): void {
+  // prevent to add the same index repeatedly.
+  ctx.PAINT_SADD.delete(idx);
   ctx.PAINT_ADD.set(idx, tr);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
@@ -366,13 +368,18 @@ function repainting_with_sadd(ctx: VT_CONTEXT, idx: number, h: number): void {
 
 /** non-block */
 function repainting_with_free(ctx: VT_CONTEXT, idx: number): void {
+  // prevent to free the same index repeatedly.
+  if (ctx.PAINT_SFREE.has(idx)) return;
   ctx.PAINT_FREE.add(idx);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
 }
 
+
 /** non-block */
 function repainting_with_sfree(ctx: VT_CONTEXT, idx: number): void {
+  // prevent to free the same index repeatedly.
+  if (ctx.PAINT_FREE.has(idx)) return;
   ctx.PAINT_SFREE.add(idx);
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx);
@@ -474,13 +481,8 @@ class VTRow extends React.Component<VTRowProps> {
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
       const key = String(props["data-row-key"]);
       if (ctx._keys2free.delete(key)) {
-        // prevent to free the same index repeatedly.
-        if (!ctx.PAINT_SFREE.has(index)) {
-          repainting_with_free(ctx, index);
-        }
+        repainting_with_free(ctx, index);
       }
-      // prevent to add the same index repeatedly.
-      ctx.PAINT_SADD.delete(index);
       repainting_with_add(ctx, index, this.inst.current);
     } else {
       /* init context */
@@ -503,10 +505,7 @@ class VTRow extends React.Component<VTRowProps> {
     if (ctx.PAINT_FREE.size && ctx.PAINT_FREE.has(index)) {
       repainting_with_add(ctx, index, this.inst.current);
     } else {
-      // prevent to free the same index repeatedly.
-      if (!ctx.PAINT_SFREE.has(index)) {
-        repainting_with_free(ctx, index);
-      }
+      repainting_with_free(ctx, index);
       repainting_with_add(ctx, index, this.inst.current);
     }
   }
@@ -530,10 +529,7 @@ class VTRow extends React.Component<VTRowProps> {
       return;
     }
 
-    // prevent to free the same index repeatedly.
-    if (!ctx.PAINT_SFREE.has(index)) {
-      repainting_with_free(ctx, index);
-    }
+    repainting_with_free(ctx, index);
   }
 
 }
