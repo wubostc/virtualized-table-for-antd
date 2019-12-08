@@ -1,3 +1,7 @@
+## 0.7.1
+  1. improve consistency to avoid incorrect rendering.
+
+
 ## 0.7.0
   1. add a new Hooks API, `useVT`.
   1. fix a bug that free the same index repeatedly.(#21)
