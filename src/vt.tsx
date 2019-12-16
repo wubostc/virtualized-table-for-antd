@@ -1170,8 +1170,9 @@ class VTable extends React.Component<VTProps> {
     let head = 0 | 0;
     let tail = 0 | 0;
     let top = 0 | 0;
-    if (flags & SCROLLEVT_RESTORETO ||
-        ( !(flags & (SCROLLEVT_INIT | SCROLLEVT_RECOMPUTE)) && scrollTop === this.scrollTop) )
+
+    if (scrollTop === this.scrollTop &&
+       (flags & (SCROLLEVT_RESTORETO | SCROLLEVT_NATIVE)) )
     {
       head = ctx._offset_head;
       tail = ctx._offset_tail;
