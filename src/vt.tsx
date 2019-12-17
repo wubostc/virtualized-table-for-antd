@@ -315,18 +315,18 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 }
 
 
-function add_h(ctx: VT_CONTEXT, idx: number, h: number): void {
+function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
   console.assert(h !== void 0, `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
-  if (ctx.debug) console.info("add", idx, h);
+  if (ctx.debug) console.info("add", identity, idx, h);
 }
 
 
-function free_h(ctx: VT_CONTEXT, idx: number): void {
+function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void {
   console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
-  if (ctx.debug) console.info("free", idx, ctx.row_height[idx]);
+  if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
 }
 
 
@@ -338,23 +338,23 @@ function _repainting(ctx: VT_CONTEXT): number {
 
     if (PAINT_FREE.size) {
       for (const idx of PAINT_FREE) {
-        free_h(ctx, idx);
+        free_h(ctx, idx, "dom");
       }
       console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
+      if (ctx.computed_h < 0) ctx.computed_h = 0;
     }
 
     if (PAINT_SFREE.size) {
       for (const idx of PAINT_SFREE) {
-        free_h(ctx, idx);
+        free_h(ctx, idx, "shadow");
       }
       console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
+      if (ctx.computed_h < 0) ctx.computed_h = 0;
     }
 
     if (PAINT_ADD.size) {
       for (const [idx, el] of PAINT_ADD) {
-        add_h(ctx, idx, el.offsetHeight);
+        add_h(ctx, idx, el.offsetHeight, "dom");
       }
       console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
@@ -362,7 +362,7 @@ function _repainting(ctx: VT_CONTEXT): number {
 
     if (PAINT_SADD.size) {
       for (const [idx, h] of PAINT_SADD) {
-        add_h(ctx, idx, h);
+        add_h(ctx, idx, h, "shadow");
       }
       console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
@@ -532,7 +532,7 @@ class VTRow extends React.Component<VTRowProps> {
         ctx.possible_hight_per_tr = h;
       }
       ctx.computed_h = 0; // reset initial value.
-      add_h(ctx, index, h);
+      add_h(ctx, index, h, "dom");
     }
   }
 
@@ -684,7 +684,9 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   for (let i = head; i < tail; ++i) {
                     const child = children[i];
                     keys.add(child.key);
-                    if (!ctx._prev_keys.has(child.key)) {
+                    if ((i >= ctx.row_height.length) &&
+                       !ctx._prev_keys.has(child.key))
+                    {
                       ctx._keys2insert++;
                       // insert a row at index `i` with height `0`.
                       ctx.row_height.splice(i, 0, 0);
@@ -732,6 +734,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   PSRB[0] = tail;
                   PSRB[1] = len;
                 } else {
+                  ctx.PAINT_ADD.clear();
+                  ctx.PAINT_FREE.clear();
                   if (len < prev_len) {
                     /* free some rows */
                     SR_n2delete = prev_len - len - (PSRB[1] - len);
@@ -1166,24 +1170,8 @@ class VTable extends React.Component<VTProps> {
       console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollLeft);
     }
 
-  
-    let head = 0 | 0;
-    let tail = 0 | 0;
-    let top = 0 | 0;
-    if (flags & SCROLLEVT_RESTORETO ||
-        ( !(flags & (SCROLLEVT_INIT | SCROLLEVT_RECOMPUTE)) && scrollTop === this.scrollTop) )
-    {
-      head = ctx._offset_head;
-      tail = ctx._offset_tail;
-      top = ctx._offset_top;
-    } else {
-      // checks every tr's height, so it may be take some times...
-      const offset = this.scroll_with_computed(scrollTop);
-      head = offset[0];
-      tail = offset[1];
-      top = offset[2];
-    }
-
+    // checks every tr's height, so it may be take some times...
+    const [head, tail, top] = this.scroll_with_computed(scrollTop);
 
     const prev_head = ctx._offset_head,
           prev_tail = ctx._offset_tail,
