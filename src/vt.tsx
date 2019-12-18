@@ -248,6 +248,58 @@ const Row = React.forwardRef(function Row(props: any, ref) {
 /**
  * the following functions bind the `ctx`.
  */
+/**
+ * returns offset: [head, tail, top] 
+ */
+function scroll_with_offset(ctx: VT_CONTEXT, top: number, table_props: any): [number, number, number] {
+
+  const {
+    row_height,
+    row_count,
+    possible_hight_per_tr,
+    overscanRowCount,
+  } = ctx;
+  let overscan = overscanRowCount;
+
+  const props = table_props;
+  if (typeof props.scroll.y === "number") {
+    ctx._raw_y = props.scroll.y as number;
+    ctx._y = ctx._raw_y;
+  } else if (typeof props.scroll.y === "string") {
+    /* a string, like "calc(100vh - 300px)" */
+    if (ctx.debug)
+      console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+    ctx._raw_y = props.scroll.y;
+    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
+  } else {
+    if (ctx.debug)
+      console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+    console.info("VT will not works well, did you forget to set `scroll.y`?");
+    ctx._raw_y = null;
+    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
+  }
+
+  console.assert(ctx._y >= 0);
+  // to calc `accumulate_top` with `row_height` and `overscan`.
+  let accumulate_top = 0, i = 0;
+  for (; i < row_count && accumulate_top <= top; ++i) {
+    accumulate_top += row_height[i];
+  }
+  while (i > 0 && overscan--) {
+    accumulate_top -= row_height[--i];
+  }
+  // the height to render.
+  let torender_h = 0, j = i;
+  for (; j < row_count && torender_h < ctx._y; ++j) {
+    torender_h += (row_height[i] === void 0) ? possible_hight_per_tr : row_height[j];
+  }
+  j += overscanRowCount * 2;
+  if (j > row_count) j = row_count;
+  // returns [head, tail, top].
+  return [0 | i, 0 | j, 0 | accumulate_top];
+}
+
+
 // set the variables for offset top/head/tail.
 function _set_offset(
   ctx: VT_CONTEXT, top: number, head: number, tail: number): void
@@ -316,18 +368,18 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 }
 
 
-function add_h(ctx: VT_CONTEXT, idx: number, h: number): void {
+function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
   console.assert(h !== void 0, `failed to apply height with index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
-  if (ctx.debug) console.info("add", idx, h);
+  if (ctx.debug) console.info("add", identity, idx, h);
 }
 
 
-function free_h(ctx: VT_CONTEXT, idx: number): void {
+function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void {
   console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
-  if (ctx.debug) console.info("free", idx, ctx.row_height[idx]);
+  if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
 }
 
 
@@ -339,23 +391,23 @@ function _repainting(ctx: VT_CONTEXT): number {
 
     if (PAINT_FREE.size) {
       for (const idx of PAINT_FREE) {
-        free_h(ctx, idx);
+        free_h(ctx, idx, "dom");
       }
       console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
+      if (ctx.computed_h < 0) ctx.computed_h = 0;
     }
 
     if (PAINT_SFREE.size) {
       for (const idx of PAINT_SFREE) {
-        free_h(ctx, idx);
+        free_h(ctx, idx, "shadow");
       }
       console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
+      if (ctx.computed_h < 0) ctx.computed_h = 0;
     }
 
     if (PAINT_ADD.size) {
       for (const [idx, el] of PAINT_ADD) {
-        add_h(ctx, idx, el.offsetHeight);
+        add_h(ctx, idx, el.offsetHeight, "dom");
       }
       console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
@@ -363,7 +415,7 @@ function _repainting(ctx: VT_CONTEXT): number {
 
     if (PAINT_SADD.size) {
       for (const [idx, h] of PAINT_SADD) {
-        add_h(ctx, idx, h);
+        add_h(ctx, idx, h, "shadow");
       }
       console.assert(ctx.computed_h !== void 0);
       console.assert(ctx.computed_h >= 0);
@@ -533,7 +585,7 @@ class VTRow extends React.Component<VTRowProps> {
         ctx.possible_hight_per_tr = h;
       }
       ctx.computed_h = 0; // reset initial value.
-      add_h(ctx, index, h);
+      add_h(ctx, index, h, "dom");
     }
   }
 
@@ -680,12 +732,23 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                    * NOTE: both of `head` and `tail` won't be changed.
                    */
                   console.assert(PSRA[1] === head && PSRB[0] === tail);
+
+                  // if (head === 0 && tail === 0) {
+                  //   const _offset = scroll_with_offset(ctx, 0, children[0].props);
+                  //   head = _offset[0];
+                  //   tail = _offset[1];
+                  //   _set_offset(ctx, 0, head, tail);
+                  //   ctx.re_computed = 0;
+                  // }
+
                   const keys = new Set<string>();
                   ctx._keys2insert = 0;
                   for (let i = head; i < tail; ++i) {
                     const child = children[i];
                     keys.add(child.key);
-                    if (!ctx._prev_keys.has(child.key)) {
+                    if ((i >= ctx.row_height.length) ||
+                       !ctx._prev_keys.has(child.key))
+                    {
                       ctx._keys2insert++;
                       // insert a row at index `i` with height `0`.
                       ctx.row_height.splice(i, 0, 0);
@@ -733,6 +796,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   PSRB[0] = tail;
                   PSRB[1] = len;
                 } else {
+                  // ctx.PAINT_ADD.clear();
+                  // ctx.PAINT_FREE.clear();
                   if (len < prev_len) {
                     /* free some rows */
                     SR_n2delete = prev_len - len - (PSRB[1] - len);
@@ -1057,69 +1122,6 @@ class VTable extends React.Component<VTProps> {
     return true;
   }
 
-  // returns [head, tail, top]
-  private scroll_with_computed(top: number): [number, number, number] {
-
-    const {
-      row_height,
-      row_count,
-      possible_hight_per_tr,
-      overscanRowCount,
-    } = ctx;
-
-    let overscan = overscanRowCount;
-
-    try {
-      const props = this.props.children[2].props.children[0].props;
-
-      if (typeof props.scroll.y === "number") {
-        ctx._raw_y = props.scroll.y as number;
-        ctx._y = ctx._raw_y;
-      } else if (typeof props.scroll.y === "string") {
-        /* a string, like "calc(100vh - 300px)" */
-        if (ctx.debug)
-          console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
-        ctx._raw_y = props.scroll.y;
-        ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
-      } else {
-        if (ctx.debug)
-          console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
-        console.info("VT will not works well, did you forget to set `scroll.y`?");
-        ctx._raw_y = null;
-        ctx._y = this.wrap_inst.current.parentElement.offsetHeight;
-      }
-    } catch {
-      // return it if there is no children.
-      return [0 | 0, 0 | 0, 0 | 0];
-    }
-
-    console.assert(ctx._y >= 0);
-
-    // to calc `accumulate_top` with `row_height` and `overscan`.
-    let accumulate_top = 0, i = 0;
-    for (; i < row_count && accumulate_top <= top; ++i) {
-      accumulate_top += row_height[i];
-    }
-
-    while (i > 0 && overscan--) {
-      accumulate_top -= row_height[--i];
-    }
-
-    // the height to render.
-    let torender_h = 0, j = i;
-    for (; j < row_count && torender_h < ctx._y; ++j) {
-      torender_h += (row_height[i] === void 0) ? possible_hight_per_tr : row_height[j];
-    }
-
-    j += overscanRowCount * 2;
-
-    if (j > row_count) j = row_count;
-
-    // returns [head, tail, top].
-    return [0 | i, 0 | j, 0 | accumulate_top];
-  }
-
-
   private scrollHook(e: any): void {
 
     if (e) {
@@ -1167,24 +1169,22 @@ class VTable extends React.Component<VTProps> {
       console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollLeft);
     }
 
-  
-    let head = 0 | 0;
-    let tail = 0 | 0;
-    let top = 0 | 0;
-    if (flags & SCROLLEVT_RESTORETO ||
-        ( !(flags & (SCROLLEVT_INIT | SCROLLEVT_RECOMPUTE)) && scrollTop === this.scrollTop) )
-    {
-      head = ctx._offset_head;
-      tail = ctx._offset_tail;
-      top = ctx._offset_top;
-    } else {
+    let head: number, tail: number, top: number;
+    try {
       // checks every tr's height, so it may be take some times...
-      const offset = this.scroll_with_computed(scrollTop);
+      const offset = scroll_with_offset(
+                       ctx,
+                       scrollTop,
+                       this.props.children[2].props.children[0].props);
+
       head = offset[0];
       tail = offset[1];
       top = offset[2];
+    } catch {
+      head = 0 | 0;
+      tail = 0 | 0;
+      top = 0 | 0;
     }
-
 
     const prev_head = ctx._offset_head,
           prev_tail = ctx._offset_tail,
