@@ -299,6 +299,7 @@ function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
 
 // scrolls the parent element to specified location.
 function _scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
+  if (!ctx.wrap_inst.current) return;
   const ele = ctx.wrap_inst.current.parentElement;
   /** ie */
   ele.scrollTop = top;
