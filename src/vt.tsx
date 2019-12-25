@@ -971,7 +971,7 @@ class VTable extends React.Component<VTProps> {
     const { _offset_top } = ctx;
 
     const { style, children, ...rest } = this.props;
-    style.position = "absolute";
+    style.position = "relative";
     style.top = _offset_top;
     const { width, ...rest_style } = style;
 
