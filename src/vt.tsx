@@ -796,29 +796,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   PSRB[0] = tail;
                   PSRB[1] = len;
                 } else {
-                  /**
-                   * apply to `computed_h` with actual DOMs, then clean them.
-                   * maybe some DOMs has been updated by themselves,
-                   * so this function will has to update `computed_h` manually.
-                   */
-                  for (const idx of ctx.PAINT_FREE) {
-                    if (idx < ctx.row_count)
-                      free_h(ctx, idx, "dom");
-                  }
-                  console.assert(ctx.computed_h !== void 0);
-                  if (ctx.computed_h < 0) ctx.computed_h = 0;
-                  ctx.PAINT_FREE.clear();
-
-                  for (const [idx, el] of ctx.PAINT_ADD) {
-                    if (idx < ctx.row_count)
-                      add_h(ctx, idx, el.offsetHeight, "dom");
-                  }
-                  console.assert(ctx.computed_h !== void 0);
-                  console.assert(ctx.computed_h >= 0);
-                  ctx.PAINT_ADD.clear();
-
-
-                  // srs diff.
+                  // ctx.PAINT_ADD.clear();
+                  // ctx.PAINT_FREE.clear();
                   if (len < prev_len) {
                     /* free some rows */
                     SR_n2delete = prev_len - len - (PSRB[1] - len);
