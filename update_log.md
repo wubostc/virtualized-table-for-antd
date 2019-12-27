@@ -1,3 +1,11 @@
+## 0.7.3
+  1. fix a bug.(#42)
+
+
+## 0.7.2
+  1. fix some bugs, thanks @liubinis86.(#35 #34).
+
+
 ## 0.7.1
   1. improve consistency to avoid incorrect rendering.
 
