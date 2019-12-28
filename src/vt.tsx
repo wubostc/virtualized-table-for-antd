@@ -110,19 +110,13 @@ interface VT_CONTEXT extends vt_opts {
                    // it's the newest value of `wrap_inst`'s height to update.
 
   HND_PAINT: number;      // a handle for Batch Repainting.
-  PAINT_ADD: Map<number/* index */, HTMLTableRowElement>;
-  PAINT_SADD: Map<number/* shadow index */, number/* height */>;
-  PAINT_FREE: Set<number/* index */>;
-  PAINT_SFREE: Set<number/* shadow index */>;
 
   /* stores [begin, end], `INIT`: [-1, -1] */
   PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
   /* render with React. */
-  _keys2free: Set<string/* key */>; // a set of the row's key that will be freed manually.
   _keys2insert: number; // a number of indexes.
-  _prev_keys: Set<string/* key */>; // stores a set of keys of the previous rendering.
 
   // persistent stroage index when switch `RUNNING` to `SUSPENDED`.
   // it will prevent to change the `ctx._computed_h`.
@@ -394,48 +388,7 @@ function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void 
 
 function _repainting(ctx: VT_CONTEXT, ms: number): number {
   const fn = () => {
-    // const { PAINT_SADD, PAINT_SFREE } = ctx;
-    
-    log_debug(ctx, "START-REPAINTING");
-
-    // if (PAINT_FREE.size) {
-    //   for (const idx of PAINT_FREE) {
-    //     free_h(ctx, idx, "dom");
-    //   }
-    //   console.assert(ctx.computed_h !== void 0);
-    //   if (ctx.computed_h < 0) ctx.computed_h = 0;
-    // }
-
-    // if (PAINT_SFREE.size) {
-    //   for (const idx of PAINT_SFREE) {
-    //     free_h(ctx, idx, "shadow");
-    //   }
-    //   console.assert(ctx.computed_h !== void 0);
-    //   if (ctx.computed_h < 0) ctx.computed_h = 0;
-    // }
-
-    // if (PAINT_ADD.size) {
-    //   for (const [idx, el] of PAINT_ADD) {
-    //     add_h(ctx, idx, el.offsetHeight, "dom");
-    //   }
-    //   console.assert(ctx.computed_h !== void 0);
-    //   console.assert(ctx.computed_h >= 0);
-    // }
-
-    // if (PAINT_SADD.size) {
-    //   for (const [idx, h] of PAINT_SADD) {
-    //     add_h(ctx, idx, h, "shadow");
-    //   }
-    //   console.assert(ctx.computed_h !== void 0);
-    //   console.assert(ctx.computed_h >= 0);
-    // }
-
-
-    // clear
-    // PAINT_SFREE.clear();
-    // PAINT_FREE.clear();
-    // PAINT_ADD.clear();
-    // PAINT_SADD.clear();
+    log_debug(ctx, "REPAINTING");
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
       // output to the buffer
@@ -444,8 +397,6 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
 
     // free this handle manually.
     ctx.HND_PAINT = 0;
-
-    log_debug(ctx, "END-REPAINTING");
   }
 
   if (ms < 0) return window.requestAnimationFrame(fn);
@@ -453,6 +404,7 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
 }
 
 
+// a wrapper function for `_repainting`.
 function repainting(ctx: VT_CONTEXT): void {
   if (ctx.HND_PAINT > 0) return;
   ctx.HND_PAINT = _repainting(ctx, -1);
@@ -861,14 +813,7 @@ class VTable extends React.Component<VTProps> {
   
         ctx.PSRA = [-1, -1];
         ctx.PSRB = [-1, -1];
-        ctx.PAINT_ADD = new Map();
-        ctx.PAINT_SADD = new Map();
-        ctx.PAINT_FREE = new Set();
-        ctx.PAINT_SFREE = new Set();
-  
-        /* init keys */
-        ctx._prev_keys = new Set();
-        ctx._keys2free = new Set();
+
         ctx._keys2insert = 0;
   
         __DIAGNOSIS__(ctx);
