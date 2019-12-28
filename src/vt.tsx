@@ -362,7 +362,7 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 }
 
 
-function apply_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow") {
+function apply_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
   console.assert(h !== void 0, `failed to apply height at index ${idx}!`);
   const _h = h - ctx.row_height[idx];
   ctx.row_height[idx] += _h;
@@ -387,7 +387,7 @@ function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void 
 
 
 function _repainting(ctx: VT_CONTEXT, ms: number): number {
-  const fn = () => {
+  const fn = (): void => {
     log_debug(ctx, "REPAINTING");
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
