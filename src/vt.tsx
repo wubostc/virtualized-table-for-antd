@@ -382,6 +382,7 @@ function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shado
 function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void {
   console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
+  if (identity === "dom") ctx.row_height[idx] = 0;
   if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
 }
 
@@ -419,29 +420,27 @@ function srs_diff(
 
   const { row_height, possible_hight_per_tr } = ctx;
 
-  if (head !== tail) {
-    if (begin > prev_begin) {
-      for (let i = prev_begin; i < begin; ++i) {
-        if (i >= head && i < tail) continue;
-        free_h(ctx, i, "shadow");
-      }
-    } else if (begin < prev_begin) {
-      for (let i = begin; i < prev_begin; ++i) {
-        if (i >= head && i < tail) continue;
-        add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
-      }
+  if (begin > prev_begin) {
+    for (let i = prev_begin; i < begin; ++i) {
+      if (i >= head && i < tail) continue;
+      free_h(ctx, i, "shadow");
     }
+  } else if (begin < prev_begin) {
+    for (let i = begin; i < prev_begin; ++i) {
+      if (i >= head && i < tail) continue;
+      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
+    }
+  }
 
-    if (end > prev_end) {
-      for (let i = prev_end; i < end; ++i) {
-        if (i >= head && i < tail) continue;
-        add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
-      }
-    } else if (end < prev_end) {
-      for (let i = end; i < prev_end; ++i) {
-        if (i >= head && i < tail) continue;
-        free_h(ctx, i, "shadow");
-      }
+  if (end > prev_end) {
+    for (let i = prev_end; i < end; ++i) {
+      if (i >= head && i < tail) continue;
+      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
+    }
+  } else if (end < prev_end) {
+    for (let i = end; i < prev_end; ++i) {
+      if (i >= head && i < tail) continue;
+      free_h(ctx, i, "shadow");
     }
   }
 
@@ -474,13 +473,11 @@ class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
   private fixed: e_FIXED;
-  private index: number;
 
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
     this.fixed = e_FIXED.UNKNOW;
-    this.index = this.props.children[0].props.index;
   }
 
   public render(): JSX.Element {
@@ -501,12 +498,14 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidMount(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
-    if (ctx._index_persister.delete(this.index)) {
+    const index = this.props.children[0].props.index;
+
+    if (ctx._index_persister.delete(index)) {
       return;
     }
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
-      apply_h(ctx, this.index, this.inst.current.offsetHeight, "dom");
+      apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
       repainting(ctx);
     } else {
       /* init context */
@@ -518,7 +517,7 @@ class VTRow extends React.Component<VTRowProps> {
         ctx.possible_hight_per_tr = h;
       }
       ctx.computed_h = 0; // reset initial value.
-      add_h(ctx, this.index, h, "dom");
+      add_h(ctx, index, h, "dom");
       // create a timeout task.
       _repainting(ctx, 16);
     }
@@ -527,16 +526,20 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidUpdate(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
-    apply_h(ctx, this.index, this.inst.current.offsetHeight, "dom");
+    const index = this.props.children[0].props.index;
+
+    apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
     repainting(ctx);
   }
 
   public componentWillUnmount(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
+    const index = this.props.children[0].props.index;
+
     // `RUNNING` -> `SUSPENDED`
     if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
-      ctx._index_persister.add(this.index);
+      ctx._index_persister.add(index);
       return;
     }
 
@@ -546,13 +549,12 @@ class VTRow extends React.Component<VTRowProps> {
       return;
     }
 
-    if (ctx.re_computed === 0) {
-      // scrolling... just return.
+    if (ctx.re_computed >= 0) {
+      // scrolling or added some rows... just return.
       return;
     }
 
-    // repainting_with_free(ctx, index);
-    free_h(ctx, this.index, "dom");
+    free_h(ctx, index, "dom");
     repainting(ctx);
   }
 
