@@ -110,19 +110,13 @@ interface VT_CONTEXT extends vt_opts {
                    // it's the newest value of `wrap_inst`'s height to update.
 
   HND_PAINT: number;      // a handle for Batch Repainting.
-  PAINT_ADD: Map<number/* index */, HTMLTableRowElement>;
-  PAINT_SADD: Map<number/* shadow index */, number/* height */>;
-  PAINT_FREE: Set<number/* index */>;
-  PAINT_SFREE: Set<number/* shadow index */>;
 
   /* stores [begin, end], `INIT`: [-1, -1] */
   PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
   /* render with React. */
-  _keys2free: Set<string/* key */>; // a set of the row's key that will be freed manually.
   _keys2insert: number; // a number of indexes.
-  _prev_keys: Set<string/* key */>; // stores a set of keys of the previous rendering.
 
   // persistent stroage index when switch `RUNNING` to `SUSPENDED`.
   // it will prevent to change the `ctx._computed_h`.
@@ -368,8 +362,17 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 }
 
 
+function apply_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
+  console.assert(h !== void 0, `failed to apply height at index ${idx}!`);
+  const _h = h - ctx.row_height[idx];
+  ctx.row_height[idx] += _h;
+  ctx.computed_h += _h;
+  if (ctx.debug) console.info("apply", identity, idx, _h);
+}
+
+
 function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
-  console.assert(h !== void 0, `failed to apply height with index ${idx}!`);
+  console.assert(h !== void 0, `failed to add the height at index ${idx}!`);
   ctx.row_height[idx] = h;
   ctx.computed_h += h; // just do add up.
   if (ctx.debug) console.info("add", identity, idx, h);
@@ -380,53 +383,13 @@ function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void 
   console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
   if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
+  if (identity === "dom") ctx.row_height[idx] = 0;
 }
 
 
-function _repainting(ctx: VT_CONTEXT): number {
-  return requestAnimationFrame(() => {
-    const { PAINT_ADD, PAINT_SADD, PAINT_FREE, PAINT_SFREE } = ctx;
-    
-    log_debug(ctx, "START-REPAINTING");
-
-    if (PAINT_FREE.size) {
-      for (const idx of PAINT_FREE) {
-        free_h(ctx, idx, "dom");
-      }
-      console.assert(ctx.computed_h !== void 0);
-      if (ctx.computed_h < 0) ctx.computed_h = 0;
-    }
-
-    if (PAINT_SFREE.size) {
-      for (const idx of PAINT_SFREE) {
-        free_h(ctx, idx, "shadow");
-      }
-      console.assert(ctx.computed_h !== void 0);
-      if (ctx.computed_h < 0) ctx.computed_h = 0;
-    }
-
-    if (PAINT_ADD.size) {
-      for (const [idx, el] of PAINT_ADD) {
-        add_h(ctx, idx, el.offsetHeight, "dom");
-      }
-      console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
-    }
-
-    if (PAINT_SADD.size) {
-      for (const [idx, h] of PAINT_SADD) {
-        add_h(ctx, idx, h, "shadow");
-      }
-      console.assert(ctx.computed_h !== void 0);
-      console.assert(ctx.computed_h >= 0);
-    }
-
-
-    // clear
-    PAINT_SFREE.clear();
-    PAINT_FREE.clear();
-    PAINT_ADD.clear();
-    PAINT_SADD.clear();
+function _repainting(ctx: VT_CONTEXT, ms: number): number {
+  const fn = (): void => {
+    log_debug(ctx, "REPAINTING");
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
       // output to the buffer
@@ -435,74 +398,49 @@ function _repainting(ctx: VT_CONTEXT): number {
 
     // free this handle manually.
     ctx.HND_PAINT = 0;
+  }
 
-    log_debug(ctx, "END-REPAINTING");
-  });
+  if (ms < 0) return window.requestAnimationFrame(fn);
+  return window.setTimeout(fn, ms);
 }
 
 
-/** non-block */
-function repainting_with_add(ctx: VT_CONTEXT, idx: number, tr: HTMLTableRowElement): void {
-  // prevent to add the same index repeatedly.
-  ctx.PAINT_SADD.delete(idx);
-  ctx.PAINT_ADD.set(idx, tr);
+// a wrapper function for `_repainting`.
+function repainting(ctx: VT_CONTEXT): void {
   if (ctx.HND_PAINT > 0) return;
-  ctx.HND_PAINT = _repainting(ctx);
-}
-
-
-/** non-block */
-function repainting_with_sadd(ctx: VT_CONTEXT, idx: number, h: number): void {
-  ctx.PAINT_SADD.set(idx, h);
-  if (ctx.HND_PAINT > 0) return;
-  ctx.HND_PAINT = _repainting(ctx);
-}
-
-
-/** non-block */
-function repainting_with_free(ctx: VT_CONTEXT, idx: number): void {
-  // prevent to free the same index repeatedly.
-  if (ctx.PAINT_SFREE.has(idx)) return;
-  ctx.PAINT_FREE.add(idx);
-  if (ctx.HND_PAINT > 0) return;
-  ctx.HND_PAINT = _repainting(ctx);
-}
-
-
-/** non-block */
-function repainting_with_sfree(ctx: VT_CONTEXT, idx: number): void {
-  ctx.PAINT_SFREE.add(idx);
-  if (ctx.HND_PAINT > 0) return;
-  ctx.HND_PAINT = _repainting(ctx);
+  ctx.HND_PAINT = _repainting(ctx, -1);
 }
 
 
 /** Shadow Rows. */
 function srs_diff(
   ctx: VT_CONTEXT, PSR: number[],
+  head: number, tail: number, // the range[head, tail) of the DOMs to render.
   begin: number, end: number, prev_begin: number, prev_end: number): void {
 
   const { row_height, possible_hight_per_tr } = ctx;
 
   if (begin > prev_begin) {
     for (let i = prev_begin; i < begin; ++i) {
-      repainting_with_sfree(ctx, i);
+      if (i >= head && i < tail) continue;
+      free_h(ctx, i, "shadow");
     }
   } else if (begin < prev_begin) {
     for (let i = begin; i < prev_begin; ++i) {
-      repainting_with_sadd(ctx, i,
-        (row_height[i] === void 0) ? possible_hight_per_tr : row_height[i]);
+      if (i >= head && i < tail) continue;
+      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
     }
   }
 
   if (end > prev_end) {
     for (let i = prev_end; i < end; ++i) {
-      repainting_with_sadd(ctx, i,
-        (row_height[i] === void 0) ? possible_hight_per_tr : row_height[i]);
+      if (i >= head && i < tail) continue;
+      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
     }
   } else if (end < prev_end) {
     for (let i = end; i < prev_end; ++i) {
-      repainting_with_sfree(ctx, i);
+      if (i >= head && i < tail) continue;
+      free_h(ctx, i, "shadow");
     }
   }
 
@@ -539,9 +477,7 @@ class VTRow extends React.Component<VTRowProps> {
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
-
     this.fixed = e_FIXED.UNKNOW;
-
   }
 
   public render(): JSX.Element {
@@ -562,19 +498,15 @@ class VTRow extends React.Component<VTRowProps> {
   public componentDidMount(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
-    const props: any = this.props;
-    const index: number = props.children[0].props.index;
+    const index = this.props.children[0].props.index;
 
-    if (ctx._index_persister.size && ctx._index_persister.delete(index)) {
+    if (ctx._index_persister.delete(index)) {
       return;
     }
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
-      const key = String(props["data-row-key"]);
-      if (ctx._keys2free.delete(key)) {
-        repainting_with_free(ctx, index);
-      }
-      repainting_with_add(ctx, index, this.inst.current);
+      apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
+      repainting(ctx);
     } else {
       /* init context */
       console.assert(ctx.vt_state === e_VT_STATE.INIT);
@@ -586,26 +518,32 @@ class VTRow extends React.Component<VTRowProps> {
       }
       ctx.computed_h = 0; // reset initial value.
       add_h(ctx, index, h, "dom");
+      // create a timeout task.
+      _repainting(ctx, 16);
     }
   }
 
   public componentDidUpdate(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
-    const index: number = this.props.children[0].props.index;
-    if (ctx.PAINT_FREE.size && ctx.PAINT_FREE.has(index)) {
-      repainting_with_add(ctx, index, this.inst.current);
+    const index = this.props.children[0].props.index;
+
+    if (ctx.row_height[index] > 0) {
+      apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
+      repainting(ctx);
+    } else if (ctx.row_height[index] === 0) {
+      // freed row, so don't need to call `apply_h`.
+      // udpate this height at the index directly, and the ctx.computed_h won't be changed.
+      ctx.row_height[index] = this.inst.current.offsetHeight;
     } else {
-      repainting_with_free(ctx, index);
-      repainting_with_add(ctx, index, this.inst.current);
+      console.assert(false);
     }
   }
 
   public componentWillUnmount(): void {
     if (this.fixed !== e_FIXED.NEITHER) return;
 
-    const props: any = this.props;
-    const index: number = props.children[0].props.index;
+    const index = this.props.children[0].props.index;
 
     // `RUNNING` -> `SUSPENDED`
     if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
@@ -613,14 +551,19 @@ class VTRow extends React.Component<VTRowProps> {
       return;
     }
 
-
     if (ctx._keys2insert > 0) {
       ctx._keys2insert--;
       // nothing to do... just return.
       return;
     }
 
-    repainting_with_free(ctx, index);
+    if (ctx.re_computed >= 0) {
+      // scrolling or added some rows... just return.
+      return;
+    }
+
+    free_h(ctx, index, "dom");
+    repainting(ctx);
   }
 
 }
@@ -673,6 +616,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
               } else if (ctx.vt_state & e_VT_STATE.RUNNING) {
 
                 let offset = 0;
+                const last_head = ctx._offset_head;
+                const last_tail = ctx._offset_tail;
                 if (tail > len) {
                   offset = tail - len;
                   tail -= offset;
@@ -680,20 +625,12 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   if (head < 0) head = 0;
                   if (tail < 0) tail = 0;
                   // update the `head` and `tail`.
-                  _set_offset(ctx, ctx._offset_top, head, tail);
+                  _set_offset(ctx,
+                    ctx._offset_top/* NOTE: invalided param, just to fill for this param */,
+                    head, tail);
                 }
 
                 const { PSRA, PSRB } = ctx;
-  
-                let fixed_PSRA0 = PSRA[0] - offset,
-                    fixed_PSRA1 = PSRA[1] - offset;
-                if (fixed_PSRA0 < 0) fixed_PSRA0 = 0;
-                if (fixed_PSRA1 < 0) fixed_PSRA1 = 0;
-  
-                let fixed_PSRB0 = PSRB[0] - offset,
-                    fixed_PSRB1 = PSRB[1] - offset;
-                if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
-                if (fixed_PSRB1 < 0) fixed_PSRB1 = 0;
 
                 if (ctx.row_count !== len) {
                   set_tr_cnt(ctx, len);
@@ -712,67 +649,20 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                  * to render rows to filter.
                  */
                 if (len > prev_len) {
-                  /**
-                   *        the current keys of trs's       the previous keys of trs's
-                   * =================================================================
-                   * shadow 10                             +9
-                   *        11                              10
-                   *        12                              11
-                   * -------head----------------------------head----------------------
-                   * render 13                              12
-                   *        14                              13
-                   *        15                              14
-                   *        16                              15
-                   * -------tail----------------------------tail----------------------
-                   * shadow 17                              16
-                   *        18                              17
-                   *                                        18
-                   * =================================================================
-                   * +: a new reocrd that will be inserted.
-                   * NOTE: both of `head` and `tail` won't be changed.
-                   */
-                  console.assert(PSRA[1] === head && PSRB[0] === tail);
-
-                  // if (head === 0 && tail === 0) {
-                  //   const _offset = scroll_with_offset(ctx, 0, children[0].props);
-                  //   head = _offset[0];
-                  //   tail = _offset[1];
-                  //   _set_offset(ctx, 0, head, tail);
-                  //   ctx.re_computed = 0;
-                  // }
-
-                  const keys = new Set<string>();
+                  /* insert */
                   ctx._keys2insert = 0;
                   for (let i = head; i < tail; ++i) {
-                    const child = children[i];
-                    keys.add(child.key);
-                    if ((i >= ctx.row_height.length) ||
-                       !ctx._prev_keys.has(child.key))
-                    {
+                    if (i >= ctx.row_height.length) {
                       ctx._keys2insert++;
                       // insert a row at index `i` with height `0`.
                       ctx.row_height.splice(i, 0, 0);
                     }
-                    trs.push(child);
+                    trs.push(children[i]);
                   }
-
-                  ctx._prev_keys = keys;
-
                 } else {
-                  const keys = new Set<string>();
-                  ctx._keys2free.clear();
                   for (let i = head; i < tail; ++i) {
-                    const child = children[i];
-                    if (fixed_PSRA1 === head && fixed_PSRB0 === tail && // no movement occurred
-                       !ctx._prev_keys.has(child.key))
-                    {
-                      // then, manually free this index befor mounting React Component.
-                      ctx._keys2free.add(child.key);
-                    }
-                    trs.push(child);
-                    keys.add(child.key);
+                    trs.push(children[i]);
                   }
-                  ctx._prev_keys = keys;
                 }
 
                 /**
@@ -780,8 +670,11 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                  * first up, Previous-Shadow-Rows below `trs`,
                  * then Previous-Shadow-Rows above `trs`.
                  */
-                // how many Shadow Rows need to be deleted.
-                let SR_n2delete = 0, SR_n2insert = 0;
+                let fixed_PSRA1 = PSRA[1] - offset;
+                if (fixed_PSRA1 < 0) fixed_PSRA1 = 0;
+  
+                let fixed_PSRB0 = PSRB[0] - offset;
+                if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
 
                 /* PSR's range: [begin, end) */
                 if (PSRB[0] === -1) {
@@ -796,18 +689,21 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   PSRB[0] = tail;
                   PSRB[1] = len;
                 } else {
-                  // ctx.PAINT_ADD.clear();
-                  // ctx.PAINT_FREE.clear();
                   if (len < prev_len) {
                     /* free some rows */
-                    SR_n2delete = prev_len - len - (PSRB[1] - len);
-                    srs_diff(ctx, PSRB, tail, len, fixed_PSRB0, PSRB[1]);
+                    srs_diff(
+                      ctx, PSRB,
+                      last_head, last_tail,
+                      tail, len, fixed_PSRB0, PSRB[1]);
                   } else if (len > prev_len) {
                     /* insert some rows */
-                    SR_n2insert = ctx._keys2insert;
-                    srs_diff(ctx, PSRB, tail, len, PSRB[0], PSRB[1] + SR_n2insert);
+                    srs_diff(
+                      ctx, PSRB,
+                      last_head, last_tail,
+                      tail, len, PSRB[0], PSRB[1]);
                   } else {
-                    srs_diff(ctx, PSRB, tail, len, PSRB[0], PSRB[1]);
+                    PSRB[0] = tail;
+                    PSRB[1] = len;
                   }
                 }
 
@@ -816,7 +712,8 @@ class VTWrapper extends React.Component<VTWrapperProps> {
                   PSRA[0] = 0;
                   PSRA[1] = 0;
                 } else {
-                  srs_diff(ctx, PSRA, 0, head, PSRA[0], fixed_PSRA1 + SR_n2delete);
+                  PSRA[0] = 0;
+                  PSRA[1] = head;
                 }
 
                 ctx.prev_row_count = ctx.row_count;
@@ -926,14 +823,7 @@ class VTable extends React.Component<VTProps> {
   
         ctx.PSRA = [-1, -1];
         ctx.PSRB = [-1, -1];
-        ctx.PAINT_ADD = new Map();
-        ctx.PAINT_SADD = new Map();
-        ctx.PAINT_FREE = new Set();
-        ctx.PAINT_SFREE = new Set();
-  
-        /* init keys */
-        ctx._prev_keys = new Set();
-        ctx._keys2free = new Set();
+
         ctx._keys2insert = 0;
   
         __DIAGNOSIS__(ctx);
