@@ -382,8 +382,8 @@ function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shado
 function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void {
   console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
   ctx.computed_h -= ctx.row_height[idx];
-  if (identity === "dom") ctx.row_height[idx] = 0;
   if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
+  if (identity === "dom") ctx.row_height[idx] = 0;
 }
 
 
