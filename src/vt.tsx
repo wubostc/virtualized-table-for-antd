@@ -528,8 +528,16 @@ class VTRow extends React.Component<VTRowProps> {
 
     const index = this.props.children[0].props.index;
 
-    apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
-    repainting(ctx);
+    if (ctx.row_height[index] > 0) {
+      apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
+      repainting(ctx);
+    } else if (ctx.row_height[index] === 0) {
+      // freed row, so don't need to call `apply_h`.
+      // udpate this height at the index directly, and the ctx.computed_h won't be changed.
+      ctx.row_height[index] = this.inst.current.offsetHeight;
+    } else {
+      console.assert(false);
+    }
   }
 
   public componentWillUnmount(): void {
