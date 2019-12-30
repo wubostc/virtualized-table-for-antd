@@ -473,11 +473,12 @@ class VTRow extends React.Component<VTRowProps> {
 
   private inst: React.RefObject<HTMLTableRowElement>;
   private fixed: e_FIXED;
-
+  private last_index: number;
   public constructor(props: VTRowProps, context: any) {
     super(props, context);
     this.inst = React.createRef();
     this.fixed = e_FIXED.UNKNOW;
+    this.last_index = this.props.children[0].props.index;
   }
 
   public render(): JSX.Element {
@@ -528,15 +529,19 @@ class VTRow extends React.Component<VTRowProps> {
 
     const index = this.props.children[0].props.index;
 
-    if (ctx.row_height[index] > 0) {
+    if (ctx.re_computed >= 0) {
       apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
       repainting(ctx);
-    } else if (ctx.row_height[index] === 0) {
-      // freed row, so don't need to call `apply_h`.
-      // udpate this height at the index directly, and the ctx.computed_h won't be changed.
-      ctx.row_height[index] = this.inst.current.offsetHeight;
     } else {
-      console.assert(false);
+      // the row moved to another index, so don't need to call `apply_h`.
+      // udpate this height at the index directly.
+      const h = this.inst.current.offsetHeight;
+      const last_h = ctx.row_height[this.last_index];
+      ctx.row_height[index] = h;
+      ctx.computed_h += h - last_h;
+      // free the height of the row at the last index to easy to mount a new row.
+      ctx.row_height[this.last_index] = 0;
+      this.last_index = index;
     }
   }
 
