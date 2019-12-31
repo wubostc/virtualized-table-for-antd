@@ -287,5 +287,7 @@
 
   ```
 
-## enjoy!
 
+## License
+
+[MIT](LICENSE)
