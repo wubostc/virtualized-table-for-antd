@@ -1,3 +1,7 @@
+## 0.7.5
+  1. improved diff algorithm, fix some bugs.
+
+
 ## 0.7.4
   1. improved diff algorithm.
 
