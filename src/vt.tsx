@@ -531,18 +531,35 @@ class VTRow extends React.Component<VTRowProps> {
 
     if (ctx.re_computed >= 0) {
       apply_h(ctx, index, this.inst.current.offsetHeight, "dom");
-      repainting(ctx);
     } else {
       // the row moved to another index, so don't need to call `apply_h`.
       // udpate this height at the index directly.
       const h = this.inst.current.offsetHeight;
       const last_h = ctx.row_height[this.last_index];
-      ctx.row_height[index] = h;
-      ctx.computed_h += h - last_h;
-      // free the height of the row at the last index to easy to mount a new row.
-      ctx.row_height[this.last_index] = 0;
-      this.last_index = index;
+
+      if (this.last_index >= ctx._offset_tail) {
+        // need to free. so
+        // first, free the current height at the index.
+        ctx.computed_h -= ctx.row_height[index];
+        // then, move and update the height.
+        ctx.computed_h += h - last_h;
+        // finaly, update the height at the index to ctx.row_height.
+        ctx.row_height[index] = h;
+      } else {
+        // move and update the height.
+        ctx.computed_h += h - last_h;
+        // finaly, update the height at the index to ctx.row_height.
+        ctx.row_height[index] = h;
+      }
+
+      if (this.last_index !== index) {
+        // free the height of the row at the last index to easy to mount a new row.
+        ctx.row_height[this.last_index] = 0;
+        this.last_index = index;
+      }
     }
+
+    repainting(ctx);
   }
 
   public componentWillUnmount(): void {
