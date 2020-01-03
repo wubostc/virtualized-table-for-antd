@@ -1054,7 +1054,7 @@ class VTable extends React.Component<VTProps> {
 
   private update_self(timestamp: number): void {
 
-    if (ctx.vt_state === e_VT_STATE.WAITING) {
+    if (ctx.vt_state & ~e_VT_STATE.RUNNING) {
       return;
     }
 
