@@ -1026,7 +1026,11 @@ class VTable extends React.Component<VTProps> {
     } else {
       ctx.vt_state = e_VT_STATE.SUSPENDED;
       const { scrollTop, scrollLeft } = ctx._React_ptr;
+
+      // free the instances.
       ctx._React_ptr = { scrollTop, scrollLeft };
+      ctx._lvt_ctx = null;
+      ctx._rvt_ctx = null;
     }
   }
 
@@ -1054,7 +1058,7 @@ class VTable extends React.Component<VTProps> {
 
   private update_self(timestamp: number): void {
 
-    if (ctx.vt_state & ~e_VT_STATE.RUNNING) {
+    if (!(ctx.vt_state & e_VT_STATE.RUNNING)) {
       return;
     }
 
