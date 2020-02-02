@@ -1032,6 +1032,10 @@ class VTable extends React.Component<VTProps> {
       ctx._lvt_ctx = null;
       ctx._rvt_ctx = null;
     }
+
+    // free the RAF.
+    cancelAnimationFrame(this.HNDID_RAF);
+    this.HNDID_RAF = 0;
   }
 
   public shouldComponentUpdate(nextProps: VTProps, nextState: any): boolean {
