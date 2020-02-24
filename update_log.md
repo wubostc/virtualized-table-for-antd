@@ -1,3 +1,7 @@
+## 0.7.6
+  1. fix: ctx._React_ptr.forceUpdate is not a function.(#46)
+
+
 ## 0.7.5
   1. improved diff algorithm, fix some bugs.
 

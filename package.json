@@ -1,6 +1,6 @@
 {
   "name": "virtualizedtableforantd",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "The virtualized table component for ant design, using typescript.",
   "keywords": [
     "antd",
