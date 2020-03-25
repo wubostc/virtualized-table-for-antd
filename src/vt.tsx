@@ -145,7 +145,8 @@ export const vt_context: Map<number, VT_CONTEXT> = new Map();
 
 
 /* overload __DIAGNOSIS__. */
-function __DIAGNOSIS__(ctx: VT_CONTEXT): void {
+function helper_diagnosis(ctx: VT_CONTEXT): void {
+  if (ctx.hasOwnProperty("__DIAGNOSIS__")) return;
   Object.defineProperty(ctx, "__DIAGNOSIS__", {
     get() {
       console.debug("OoOoOoO DIAGNOSIS OoOoOoO");
@@ -173,8 +174,6 @@ function __DIAGNOSIS__(ctx: VT_CONTEXT): void {
 
 function log_debug(ctx: VT_CONTEXT, msg: string): void {
   if (ctx.debug) {
-    ctx = { ...ctx };
-    __DIAGNOSIS__(ctx);
     const ts = new Date().getTime();
     console.debug(`%c[${ctx.id}][${ts}][${msg}] vt`, "color:#a00", ctx);
   }
@@ -848,7 +847,7 @@ class VTable extends React.Component<VTProps> {
 
         ctx._keys2insert = 0;
   
-        __DIAGNOSIS__(ctx);
+        helper_diagnosis(ctx);
 
         ctx._index_persister = new Set();
 
