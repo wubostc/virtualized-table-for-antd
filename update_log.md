@@ -1,3 +1,6 @@
+## 0.7.7
+  1. fix: `Cannot redefine property: __DIAGNOSIS__`(#55).
+
 ## 0.7.6
   1. fix: ctx._React_ptr.forceUpdate is not a function.(#46)
 
