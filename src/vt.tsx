@@ -14,11 +14,6 @@ import * as React from "react";
 import { TableComponents } from "antd/lib/table/interface";
 
 
-interface obj extends Object {
-  [field: string]: any;
-}
-
-
 export
 interface vt_opts extends Object {
   readonly id: number;
@@ -26,11 +21,6 @@ interface vt_opts extends Object {
    * @default 5
    */
   overscanRowCount?: number;
-
-  /**
-   * @deprecated
-   */
-  reflection?: string[] | string;
 
   /**
    * wheel event(only works on native events).
@@ -112,7 +102,6 @@ interface VT_CONTEXT extends vt_opts {
   HND_PAINT: number;      // a handle for Batch Repainting.
 
   /* stores [begin, end], `INIT`: [-1, -1] */
-  PSRA: number[]; // represents the Previous Shadow-Rows Above `trs`.
   PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
   /* render with React. */
@@ -599,164 +588,142 @@ type VTWrapperProps = {
 
 
 class VTWrapper extends React.Component<VTWrapperProps> {
-
-  public constructor(props: VTWrapperProps, context: any) {
-    super(props, context);
-  }
+  declare context: React.ContextType<typeof S>
+  static contextType = S
 
   public render(): JSX.Element {
     const { children, ...restProps } = this.props;
-    return (
-      <S.Consumer>
-        {
-          ({ fixed }) => {
+    const fixed = this.context.fixed;
+    const { _offset_head, _offset_tail } = ctx;
+    let head = _offset_head;
+    let tail = _offset_tail;
 
-            const { _offset_head, _offset_tail } = ctx;
-            let head = _offset_head;
-            let tail = _offset_tail;
+    const trs: any[] = [];
+    let len = children.length;
 
-            const trs: any[] = [];
-            let len = children.length;
+    const Wrapper = ctx.components.body.wrapper;
 
-            const Wrapper = ctx.components.body.wrapper;
+    switch (ctx.vt_state) {
+      case e_VT_STATE.WAITING:
+        // waitting for loading data as soon, just return this as following.
+        break;
 
-            if (ctx.vt_state === e_VT_STATE.WAITING) {
-              // waitting for loading data as soon, just return this as following.
-              return <Wrapper {...restProps}>{trs}</Wrapper>;
-            }
-
-            if (len >= 0 && fixed === e_FIXED.NEITHER) {
-
-              if (ctx.vt_state === e_VT_STATE.INIT) {
-                /* init trs [0, 1] */
-                for (let i = head; i < tail; ++i) {
-                  trs.push(children[i]);
-                }
-
-                if (ctx.row_count !== len) {
-                  set_tr_cnt(ctx, len);
-                }
-
-              } else if (ctx.vt_state & e_VT_STATE.RUNNING) {
-
-                let offset = 0;
-                const last_head = ctx._offset_head;
-                const last_tail = ctx._offset_tail;
-                if (tail > len) {
-                  offset = tail - len;
-                  tail -= offset;
-                  head -= offset;
-                  if (head < 0) head = 0;
-                  if (tail < 0) tail = 0;
-                  // update the `head` and `tail`.
-                  _set_offset(ctx,
-                    ctx._offset_top/* NOTE: invalided param, just to fill for this param */,
-                    head, tail);
-                }
-
-                const { PSRA, PSRB } = ctx;
-
-                if (ctx.row_count !== len) {
-                  set_tr_cnt(ctx, len);
-                }
-
-                len = ctx.row_count;
-                let prev_len = ctx.prev_row_count;
-
-                if (ctx.vt_state & e_VT_STATE.PROTECTION) {
-                  ctx.vt_state &= ~e_VT_STATE.PROTECTION;
-                  prev_len = len;
-                }
-
-                /**
-                 * start rendering phase.
-                 * to render rows to filter.
-                 */
-                if (len > prev_len) {
-                  /* insert */
-                  ctx._keys2insert = 0;
-                  for (let i = head; i < tail; ++i) {
-                    if (i >= ctx.row_height.length) {
-                      ctx._keys2insert++;
-                      // insert a row at index `i` with height `0`.
-                      ctx.row_height.splice(i, 0, 0);
-                    }
-                    trs.push(children[i]);
-                  }
-                } else {
-                  for (let i = head; i < tail; ++i) {
-                    trs.push(children[i]);
-                  }
-                }
-
-                /**
-                 * start srs_diff phase.
-                 * first up, Previous-Shadow-Rows below `trs`,
-                 * then Previous-Shadow-Rows above `trs`.
-                 */
-                let fixed_PSRA1 = PSRA[1] - offset;
-                if (fixed_PSRA1 < 0) fixed_PSRA1 = 0;
-  
-                let fixed_PSRB0 = PSRB[0] - offset;
-                if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
-
-                /* PSR's range: [begin, end) */
-                if (PSRB[0] === -1) {
-                  // init Rows.
-                  const rows = new Array(tail - 1/* substract the first row */).fill(0, 0, tail - 1);
-                  ctx.row_height = ctx.row_height.concat(rows);
-                  // init Shadow Rows.
-                  const shadow_rows = new Array(len - tail).fill(ctx.possible_hight_per_tr, 0, len - tail);
-                  ctx.row_height = ctx.row_height.concat(shadow_rows);
-                  ctx.computed_h = ctx.computed_h + ctx.possible_hight_per_tr * (len - tail);
-
-                  PSRB[0] = tail;
-                  PSRB[1] = len;
-                } else {
-                  if (len < prev_len) {
-                    /* free some rows */
-                    srs_diff(
-                      ctx, PSRB,
-                      last_head, last_tail,
-                      tail, len, fixed_PSRB0, PSRB[1]);
-                  } else if (len > prev_len) {
-                    /* insert some rows */
-                    srs_diff(
-                      ctx, PSRB,
-                      last_head, last_tail,
-                      tail, len, PSRB[0], PSRB[1]);
-                  } else {
-                    PSRB[0] = tail;
-                    PSRB[1] = len;
-                  }
-                }
-
-                if (PSRA[0] === -1) {
-                  // init Shadow Rows.
-                  PSRA[0] = 0;
-                  PSRA[1] = 0;
-                } else {
-                  PSRA[0] = 0;
-                  PSRA[1] = head;
-                }
-
-                ctx.prev_row_count = ctx.row_count;
-              } /* RUNNING */
-
-            } /* len && this.fixed === e_FIXED.NEITHER */
-
-            /* fixed L R */
-            if (len >= 0 && fixed !== e_FIXED.NEITHER) {
-              for (let i = head; i < tail; ++i) {
-                trs.push(children[i]);
-              }
-            }
-
-            return <Wrapper {...restProps}>{trs}</Wrapper>;
+      case e_VT_STATE.INIT:
+      case e_VT_STATE.SUSPENDED:
+        if (len >= 0 && fixed === e_FIXED.NEITHER) {
+          /* init trs [0, 1] */
+          for (let i = head; i < tail; ++i) {
+            trs.push(children[i]);
+          }
+          if (ctx.row_count !== len) {
+            set_tr_cnt(ctx, len);
           }
         }
-      </S.Consumer>
-    );
+        break;
+
+      default: {
+        /* fixed L R */
+        if (len >= 0 && fixed !== e_FIXED.NEITHER) {
+          for (let i = head; i < tail; ++i) {
+            trs.push(children[i]);
+          }
+          break;
+        }
+        let offset = 0;
+        const last_head = ctx._offset_head;
+        const last_tail = ctx._offset_tail;
+        if (tail > len) {
+          offset = tail - len;
+          tail -= offset;
+          head -= offset;
+          if (head < 0) head = 0;
+          if (tail < 0) tail = 0;
+          // update the `head` and `tail`.
+          _set_offset(ctx,
+            ctx._offset_top/* NOTE: invalided param, just to fill for this param */,
+            head, tail);
+        }
+
+        const { PSRB } = ctx;
+
+        if (ctx.row_count !== len) {
+          set_tr_cnt(ctx, len);
+        }
+
+        len = ctx.row_count;
+        let prev_len = ctx.prev_row_count;
+
+        if (ctx.vt_state & e_VT_STATE.PROTECTION) {
+          ctx.vt_state &= ~e_VT_STATE.PROTECTION;
+          prev_len = len;
+        }
+
+        /**
+         * start rendering phase.
+         * to render rows to filter.
+         */
+        if (len > prev_len) {
+          /* insert */
+          ctx._keys2insert = 0;
+          for (let i = head; i < tail; ++i) {
+            if (i >= ctx.row_height.length) {
+              ctx._keys2insert++;
+              // insert a row at index `i` with height `0`.
+              ctx.row_height.splice(i, 0, 0);
+            }
+            trs.push(children[i]);
+          }
+        } else {
+          for (let i = head; i < tail; ++i) {
+            trs.push(children[i]);
+          }
+        }
+
+        /**
+         * start srs_diff phase.
+         * first up, Previous-Shadow-Rows below `trs`,
+         * then Previous-Shadow-Rows above `trs`.
+         */
+        let fixed_PSRB0 = PSRB[0] - offset;
+        if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
+
+        /* PSR's range: [begin, end) */
+        if (PSRB[0] === -1) {
+          // init Rows.
+          const rows = new Array(tail - 1/* substract the first row */).fill(0, 0, tail - 1);
+          ctx.row_height = ctx.row_height.concat(rows);
+          // init Shadow Rows.
+          const shadow_rows = new Array(len - tail).fill(ctx.possible_hight_per_tr, 0, len - tail);
+          ctx.row_height = ctx.row_height.concat(shadow_rows);
+          ctx.computed_h = ctx.computed_h + ctx.possible_hight_per_tr * (len - tail);
+
+          PSRB[0] = tail;
+          PSRB[1] = len;
+        } else {
+          if (len < prev_len) {
+            /* free some rows */
+            srs_diff(
+              ctx, PSRB,
+              last_head, last_tail,
+              tail, len, fixed_PSRB0, PSRB[1]);
+          } else if (len > prev_len) {
+            /* insert some rows */
+            srs_diff(
+              ctx, PSRB,
+              last_head, last_tail,
+              tail, len, PSRB[0], PSRB[1]);
+          } else {
+            PSRB[0] = tail;
+            PSRB[1] = len;
+          }
+        }
+
+        ctx.prev_row_count = ctx.row_count;
+        break;
+      }
+    }
+
+    return <Wrapper {...restProps}>{trs}</Wrapper>;
   }
 
   public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: any): boolean {
@@ -771,7 +738,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 type VTProps = {
   children: any[];
   style: React.CSSProperties;
-} & obj;
+};
 
 class VTable extends React.Component<VTProps> {
 
@@ -780,9 +747,6 @@ class VTable extends React.Component<VTProps> {
   private scrollTop: number;
   private scrollLeft: number;
   private fixed: e_FIXED;
-
-
-  private user_context: obj;
 
 
   private event_queue: Array<SimEvent>;
@@ -811,20 +775,8 @@ class VTable extends React.Component<VTProps> {
     }
 
 
-
     if (this.fixed === e_FIXED.NEITHER) {
       this.restoring = false;
-
-      this.user_context = {};
-
-      let reflection = ctx.reflection || [];
-      if (typeof reflection === "string") {
-        reflection = [reflection];
-      }
-  
-      for (let i = 0; i < reflection.length; ++i) {
-        this.user_context[reflection[i]] = this.props[reflection[i]];
-      }
   
       this.event_queue = [];
       this.nevent_queue = [];
@@ -832,7 +784,6 @@ class VTable extends React.Component<VTProps> {
 
       this.HNDID_RAF = 0;
     }
-
 
 
     if (ctx.vt_state === e_VT_STATE.INIT) {
@@ -845,7 +796,6 @@ class VTable extends React.Component<VTProps> {
         ctx.row_count = 0;
         ctx.prev_row_count = 0;
   
-        ctx.PSRA = [-1, -1];
         ctx.PSRB = [-1, -1];
 
         ctx._keys2insert = 0;
@@ -863,12 +813,9 @@ class VTable extends React.Component<VTProps> {
       ctx.WH = 0;
 
     } else {
+      console.assert(ctx.vt_state === e_VT_STATE.SUSPENDED);
+
       if (this.fixed === e_FIXED.NEITHER) {
-        console.assert(ctx.vt_state === e_VT_STATE.SUSPENDED);
-
-        /* `SUSPENDED` -> `WAITING` */
-        ctx.vt_state = e_VT_STATE.WAITING;
-
         const { scrollTop, scrollLeft } = ctx._React_ptr;
         this.scrollTop = scrollTop;
         this.scrollLeft = scrollLeft;
@@ -896,7 +843,7 @@ class VTable extends React.Component<VTProps> {
         ref={this.wrap_inst}
         style={{ width, position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }}
       >
-        <S.Provider value={{ fixed: this.fixed, ...this.user_context }}>
+        <S.Provider value={{ fixed: this.fixed }}>
           <Table {...rest} ref={this.inst} style={rest_style}>{children}</Table>
         </S.Provider>
       </div>
@@ -946,8 +893,10 @@ class VTable extends React.Component<VTProps> {
     // 0 - head, 2 - body
     const children = this.props.children[2].props.children;
 
-    if (ctx.vt_state === e_VT_STATE.WAITING) {
-      /* switch `SUSPENDED` to `WAITING` from VT's constructor. */
+    if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
+      /* `SUSPENDED` -> `WAITING` */
+      ctx.vt_state = e_VT_STATE.WAITING;
+
       if (children.length) {
         // just only switch to `RUNNING`.
         ctx.vt_state = e_VT_STATE.RUNNING;
@@ -1237,7 +1186,11 @@ class VTable extends React.Component<VTProps> {
       }
 
       if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.row_count >= 0) {
-        setTimeout(() => this.forceUpdate(), 0);
+        setTimeout(() => {
+          if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.row_count >= 0) {
+            this.forceUpdate();
+          }
+        }, 0);
       }
 
       return {
@@ -1311,19 +1264,7 @@ function init_vt(id: number): VT_CONTEXT {
 
 export
 function VTComponents(vt_opts: vt_opts): TableComponents {
-
-  if (Object.hasOwnProperty.call(vt_opts, "height")) {
-    console.warn(`The property \`vt_opts.height\` has been deprecated.
-                  Now it depends entirely on \`scroll.y\`.`);
-  }
-
-  if (Object.hasOwnProperty.call(vt_opts, "reflection")) {
-    console.warn(`The property \`vt_opts.reflection\`
-                  will be deprecated in the next release.`);
-  }
-
   const inside = init_vt(vt_opts.id);
-
 
   Object.assign(
     inside,
@@ -1341,27 +1282,9 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
   return inside._vtcomponents;
 }
 
-/**
- * @deprecated 
- */
-export
-function getVTContext(id: number): React.Context<vt_ctx> {
-  console.warn("This function will be deprecated in the next release.");
-  return init_vt(id)._store;
-}
-
 export
 function setComponents(id: number, components: TableComponents): void {
   _set_components(init_vt(id), components);
-}
-
-/**
- * @deprecated
- */
-export
-function getVTComponents(id: number): TableComponents {
-  console.warn("This function will be deprecated in the next release.")
-  return init_vt(id).components;
 }
 
 export
