@@ -584,27 +584,23 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   public render(): JSX.Element {
     const { children, ...restProps } = this.props;
     const fixed = this.context.fixed;
-    const { _offset_head, _offset_tail } = ctx;
-    let head = _offset_head;
-    let tail = _offset_tail;
+    let { _offset_head: head, _offset_tail: tail } = ctx;
 
-    const trs: any[] = [];
+    let trs: any[];
     let len = children.length;
 
     const Wrapper = ctx.components.body.wrapper;
 
     switch (ctx.vt_state) {
-      case e_VT_STATE.WAITING:
-        // waitting for loading data as soon, just return this as following.
+      case e_VT_STATE.WAITING: // waitting for loading data as soon, just return this as following.
+      case e_VT_STATE.SUSPENDED:
+        trs = children.slice(head, tail);
         break;
 
       case e_VT_STATE.INIT:
-      case e_VT_STATE.SUSPENDED:
         if (len >= 0 && fixed === e_FIXED.NEITHER) {
           /* init trs [0, 1] */
-          for (let i = head; i < tail; ++i) {
-            trs.push(children[i]);
-          }
+          trs = children.slice(head, tail);
           if (ctx.row_count !== len) {
             set_tr_cnt(ctx, len);
           }
@@ -614,9 +610,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
       default: {
         /* fixed L R */
         if (len >= 0 && fixed !== e_FIXED.NEITHER) {
-          for (let i = head; i < tail; ++i) {
-            trs.push(children[i]);
-          }
+          trs = children.slice(head, tail);
           break;
         }
         let offset = 0;
@@ -653,6 +647,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
          * to render rows to filter.
          */
         if (len > prev_len) {
+          trs = [];
           /* insert */
           ctx._keys2insert = 0;
           for (let i = head; i < tail; ++i) {
@@ -664,9 +659,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
             trs.push(children[i]);
           }
         } else {
-          for (let i = head; i < tail; ++i) {
-            trs.push(children[i]);
-          }
+          trs = children.slice(head, tail);
         }
 
         /**
