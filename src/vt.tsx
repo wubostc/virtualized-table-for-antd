@@ -458,34 +458,24 @@ type VTRowProps = {
 };
 
 class VTRow extends React.Component<VTRowProps> {
-
+  declare context: React.ContextType<typeof S>
   private inst: React.RefObject<HTMLTableRowElement>;
-  private fixed: e_FIXED;
   private last_index: number;
-  public constructor(props: VTRowProps, context: any) {
+  static contextType = S
+  public constructor(props: VTRowProps, context: React.ContextType<typeof S>) {
     super(props, context);
     this.inst = React.createRef();
-    this.fixed = e_FIXED.UNKNOW;
     this.last_index = this.props.children[0].props.index;
   }
 
   public render(): JSX.Element {
     const { children, ...restProps } = this.props;
-    return (
-      <S.Consumer>
-        {
-          ({ fixed }) => {
-            if (this.fixed === e_FIXED.UNKNOW) this.fixed = fixed;
-            const Row = ctx.components.body.row;
-            return <Row {...restProps} ref={this.inst}>{children}</Row>;
-          }
-        }
-      </S.Consumer>
-    )
+    const Row = ctx.components.body.row;
+    return <Row {...restProps} ref={this.inst}>{children}</Row>;
   }
 
   public componentDidMount(): void {
-    if (this.fixed !== e_FIXED.NEITHER) return;
+    if (this.context.fixed !== e_FIXED.NEITHER) return;
 
     const index = this.props.children[0].props.index;
 
@@ -513,7 +503,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentDidUpdate(): void {
-    if (this.fixed !== e_FIXED.NEITHER) return;
+    if (this.context.fixed !== e_FIXED.NEITHER) return;
 
     const index = this.props.children[0].props.index;
 
@@ -551,7 +541,7 @@ class VTRow extends React.Component<VTRowProps> {
   }
 
   public componentWillUnmount(): void {
-    if (this.fixed !== e_FIXED.NEITHER) return;
+    if (this.context.fixed !== e_FIXED.NEITHER) return;
 
     const index = this.props.children[0].props.index;
 
