@@ -146,23 +146,26 @@ export const vt_context: Map<number, VT_CONTEXT> = new Map();
 
 /* overload __DIAGNOSIS__. */
 function helper_diagnosis(ctx: VT_CONTEXT): void {
-  if (ctx.hasOwnProperty("__DIAGNOSIS__")) return;
-  Object.defineProperty(ctx, "__DIAGNOSIS__", {
+  if (ctx.hasOwnProperty("CLICK~__DIAGNOSIS__")) return;
+  Object.defineProperty(ctx, "CLICK~__DIAGNOSIS__", {
     get() {
       console.debug("OoOoOoO DIAGNOSIS OoOoOoO");
-      let total = 0;
+      let expect_height = 0;
       for (let i = 0; i < ctx.row_count; ++i) {
-        total += ctx.row_height[i];
+        expect_height += ctx.row_height[i];
       }
-      let color: string;
-      if (total > ctx.computed_h) {
+      let color: string, explain: string;
+      if (expect_height > ctx.computed_h) {
         color = "color:rgb(15, 179, 9)"; // green
-      } else if (total < ctx.computed_h) {
+        explain = "lower than expected";
+      } else if (expect_height < ctx.computed_h) {
         color = "color:rgb(202, 61, 81)"; // red
+        explain = "higher than expected";
       } else {
         color = "color:rgba(0, 0, 0, 0.85)";
+        explain = "normal";
       }
-      console.debug("Verify %c%d(%d)", color, total, ctx.computed_h - total);
+      console.debug(`%c%d(%d)(${explain})`, color, expect_height, ctx.computed_h - expect_height);
       console.debug("OoOoOoOoOoOoOOoOoOoOoOoOo");
     },
     configurable: false,
