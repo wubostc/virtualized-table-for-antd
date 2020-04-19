@@ -1,3 +1,19 @@
+## 0.7.8(zh)
+  1. fix: 删除被标记为`deprecated`的接口和参数。
+      + 接口：`getVTComponents`
+      + 接口：`getVTContext`
+      + 参数：`vt_opts.reflection`
+  1. refacotry: 一些细小重构。
+
+
+## 0.7.8(en)
+  1. fix: delete the APIs and the params marked as `deprecated`.
+      + API：`getVTComponents`
+      + API：`getVTContext`
+      + param：`vt_opts.reflection`
+  1. refacotry: some minor refactorings.
+
+
 ## 0.7.7
   1. fix: `Cannot redefine property: __DIAGNOSIS__`(#55).
 

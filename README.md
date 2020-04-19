@@ -1,4 +1,4 @@
-# The virtualized table component for Ant Design
+# The virtualized table component for Ant Design，fast and restorable.
 
 
 ![npm](https://img.shields.io/npm/v/virtualizedtableforantd)
@@ -14,7 +14,7 @@
 + All interfaces([hooks](#hooks) added in v0.7.x)
   ```typescript
 
-  // the param of the func VTComponents
+  // the param of the func VTComponents.
   interface vt_opts extends Object {
       readonly id: number;
       /**
@@ -22,12 +22,9 @@
       */
       overscanRowCount?: number;
       /**
-       * @deprecated
-      */
-      reflection?: string[] | string;
-      /**
        * wheel event(only works on native events).
-      */
+       * 滚轮事件（只对原生事件有效）。
+       */
       onScroll?: ({ left, top, isEnd, }: {
           top: number;
           left: number;
@@ -45,9 +42,7 @@
 
   /* all APIs */
   export declare function VTComponents(vt_opts: vt_opts): TableComponents;
-  export declare function getVTContext(id: number): React.Context<vt_ctx>; /** @deprecated */
   export declare function setComponents(id: number, components: TableComponents): void;
-  export declare function getVTComponents(id: number): TableComponents; /** @deprecated */
   export declare function VTScroll(id: number, param?: {
       top: number;
       left: number;
@@ -59,8 +54,20 @@
 
 
 + Quick start
+  > You need to change your style like following if your Table.size is not default.
+  
+  > 如果你的Table.size不是默认的话，你需要修改像下面一样的style。
+
+  ```less
+  // size={'small'}
+  ant-table [vt] > table > .ant-table-tbody > tr > td {
+      padding: 8px;
+  }
+  ```
   ```typescript
+  import React from 'react';
   import { Table } from 'antd';
+  import { VTComponents } from 'virtualedtableforantd';
 
   // using in the antd table
   <Table
@@ -75,23 +82,15 @@
   />
   ```
 
-  > Maybe you need to fix your style.
 
-  ```less
-  ant-table [vt] > table > .ant-table-tbody > tr > td {
-      padding: 8px;
-  }
-  ```
-
-
-+ Restoring last state
++ Restoring last state ([including hooks version](#restoring-hook))
   ```typescript
   import React, { PureComponent, useEffect } from 'react';
   import { Table } from 'antd';
 
   const ctx = { top: 0 };
 
-  // Class version.
+  /* Class version. */
   class Users extends PureComponent {
     constructor(...args) {
       super(...args);
@@ -118,24 +117,35 @@
       ctx.top = VTScroll(1000).top;
     }
   }
+  ```
 
-  // Hooks version.
+<a id="restoring-hooks"></a>
+
+  ```typescript
+  /* Hooks version. */
+  import React, { useEffect } from 'react';
+  import { Table } from 'antd';
+  import { useVT } from 'virtualedtableforantd';
+
+  const ctx = { top: 0 };
   function Users() {
 
-    useEffect(() => {
-      VTScroll(1000, { top: ctx.top });
+    const [
+      VT,
+      setComponents, // no longer needs the param id.
+      VTScroll,      // no longer needs the param id.
+      ] = useVT({ onScoll: ({ left, top }) => ctx.top = top });
 
-      return () => ctx.top = VTScroll(1000).top;
+    useEffect(() => {
+      VTScroll({ top: ctx.top });
+
+      return () => ctx.top = VTScroll().top;
     }, []);
 
     return (
       <Table
         scroll={{ y: 500 }}
-        components={VTComponents({
-          id: 1000,
-          onScoll: ({ left, top }) => ctx.top = top
-          })
-        }
+        components={VT}
         columns={/*your columns*/}
         dataSource={/*your dataSource*/}
       />
@@ -164,7 +174,10 @@
 
 + Editable Table
 
-  > there are two examples here `./test/CustomRows.jsx`,`./test/Editable Rows.jsx`
+  > there are 3 examples following:
+    - [CustomRows](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/CustomRows.jsx)
+    - [CustomRows Hooks](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/CustomRows%20Hooks.jsx)
+    - [Editable Rows](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/Editable%20Rows.jsx)
 
 
 
