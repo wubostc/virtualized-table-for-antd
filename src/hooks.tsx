@@ -9,9 +9,9 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import React, { useRef, useMemo, } from "react";
+import { useRef, useMemo, } from "react";
 import { VTComponents, VTScroll, setComponents, vt_opts, vt_context } from "./vt";
-import { TableComponents } from "antd/lib/table/interface";
+import { TableComponents } from "rc-table/es/interface";
 
 /**
  * @private functions
@@ -34,7 +34,7 @@ function init_once<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
 /**
  * `destroy` is invalid within Hooks.
  */
-export type vt_opts_t = Omit<vt_opts, "id" | "reflection" | "destroy">;
+export type vt_opts_t<T> = Omit<vt_opts<T>, "id" | "destroy">;
 
 
 /**
@@ -61,8 +61,8 @@ export type vt_opts_t = Omit<vt_opts, "id" | "reflection" | "destroy">;
  * );
  * }
  */
-export function useVT(opts: vt_opts_t): [TableComponents,
-                                        (components: TableComponents) => void,
+export function useVT<RecordType>(opts: vt_opts_t<RecordType>): [TableComponents<RecordType>,
+                                        (components: TableComponents<RecordType>) => void,
                                         (param?: { top: number; left: number }) => {
                                           top: number;
                                           left: number;
@@ -71,7 +71,7 @@ export function useVT(opts: vt_opts_t): [TableComponents,
 
   const _id = init_once(_generate_id);
   const _lambda_scroll = init_once(() => (param?: { top: number; left: number }) => VTScroll(_id, param));
-  const _lambda_set = init_once(() => (components: TableComponents) => setComponents(_id, components));
+  const _lambda_set = init_once(() => (components: TableComponents<RecordType>) => setComponents(_id, components));
 
   return [VTComponents({ ...opts, id: _id, destroy: true }), _lambda_set, _lambda_scroll];
 }

@@ -52,7 +52,7 @@
     "typescript": "^3.7.2"
   },
   "dependencies": {
-    "antd": "^3.13.6",
+    "antd": "^4.0.0",
     "react": "^16.0.0",
     "react-dom": "^16.0.0"
   }

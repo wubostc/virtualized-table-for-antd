@@ -11,16 +11,21 @@ The above copyright notice and this permission notice shall be included in all c
 
 
 import * as React from "react";
-import { TableComponents } from "antd/lib/table/interface";
-
+import { TableComponents, CustomizeComponent } from "rc-table/es/interface";
+import { TableProps as RcTableProps } from 'rc-table/es/Table';
 
 export
-interface vt_opts extends Object {
+interface vt_opts<RecordType> {
   readonly id: number;
   /**
    * @default 5
    */
   overscanRowCount?: number;
+
+  /**
+   * this only needs the scroll.y
+   */
+  scroll: RcTableProps<RecordType>['scroll'];
 
   /**
    * wheel event(only works on native events).
@@ -69,12 +74,19 @@ interface vt_ctx {
 }
 
 
-interface VT_CONTEXT extends vt_opts {
+type body_t = {
+  wrapper?: CustomizeComponent;
+  row?: CustomizeComponent;
+  cell?: CustomizeComponent;
+}
+
+
+interface VT_CONTEXT<RecordType = any> extends vt_opts<any> {
   _y: number; // will use the Table.scroll.y.
   _raw_y: number | string; // this is the same as the `Table.scroll.y`.
 
-  _vtcomponents: TableComponents; // virtual layer.
-  components: TableComponents;    // implementation layer.
+  _vtcomponents: TableComponents<RecordType>; // virtual layer.
+  components: TableComponents<RecordType>;    // implementation layer.
   computed_h: number;
   vt_state: e_VT_STATE;
   possible_hight_per_tr: number;
@@ -92,8 +104,8 @@ interface VT_CONTEXT extends vt_opts {
 
   _React_ptr: any; // a pointer to the instance of `VTable`.
 
-  _lvt_ctx: VT_CONTEXT; // fixed left.
-  _rvt_ctx: VT_CONTEXT; // fixed right.
+  _lvt_ctx: VT_CONTEXT<RecordType>; // fixed left.
+  _rvt_ctx: VT_CONTEXT<RecordType>; // fixed right.
 
 
   WH: number;      // Wrapped Height.
@@ -130,7 +142,7 @@ interface VT_CONTEXT extends vt_opts {
 /**
  * @global
  */
-export const vt_context: Map<number, VT_CONTEXT> = new Map();
+export const vt_context: Map<number, VT_CONTEXT<any>> = new Map();
 
 
 /* overload __DIAGNOSIS__. */
@@ -225,6 +237,11 @@ const Row = React.forwardRef(function Row(props: any, ref) {
 
 
 
+function get_data(children: any[]): any[] {
+  return children[1].props.data;
+}
+
+
 /**
  * define CONSTANTs.
  */
@@ -236,7 +253,7 @@ const Row = React.forwardRef(function Row(props: any, ref) {
 /**
  * returns offset: [head, tail, top] 
  */
-function scroll_with_offset(ctx: VT_CONTEXT, top: number, table_props: any): [number, number, number] {
+function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['scroll']['y']): [number, number, number] {
 
   const {
     row_height,
@@ -246,19 +263,18 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, table_props: any): [nu
   } = ctx;
   let overscan = overscanRowCount;
 
-  const props = table_props;
-  if (typeof props.scroll.y === "number") {
-    ctx._raw_y = props.scroll.y as number;
+  if (typeof scroll_y === "number") {
+    ctx._raw_y = scroll_y as number;
     ctx._y = ctx._raw_y;
-  } else if (typeof props.scroll.y === "string") {
+  } else if (typeof scroll_y === "string") {
     /* a string, like "calc(100vh - 300px)" */
     if (ctx.debug)
-      console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
-    ctx._raw_y = props.scroll.y;
+      console.warn(`AntD.Table.scroll.y: ${scroll_y}, it may cause performance problems.`);
+    ctx._raw_y = scroll_y;
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   } else {
     if (ctx.debug)
-      console.warn(`AntD.Table.scroll.y: ${props.scroll.y}, it may cause performance problems.`);
+      console.warn(`AntD.Table.scroll.y: ${scroll_y}, it may cause performance problems.`);
     console.info("VT will not works well, did you forget to set `scroll.y`?");
     ctx._raw_y = null;
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
@@ -473,7 +489,8 @@ class VTRow extends React.Component<VTRowProps> {
 
   public render(): JSX.Element {
     const { children, ...restProps } = this.props;
-    const Row = ctx.components.body.row;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const Row = (ctx.components.body as body_t).row;
     return <Row {...restProps} ref={this.inst}>{children}</Row>;
   }
 
@@ -582,14 +599,16 @@ class VTWrapper extends React.Component<VTWrapperProps> {
   static contextType = S
 
   public render(): JSX.Element {
-    const { children, ...restProps } = this.props;
+    const { children: _children, ...restProps } = this.props;
     const fixed = this.context.fixed;
     let { _offset_head: head, _offset_tail: tail } = ctx;
 
     let trs: any[];
-    let len = children.length;
+    let len = _children[1].length;
+    const children = _children[1];
 
-    const Wrapper = ctx.components.body.wrapper;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const Wrapper = (ctx.components.body as body_t).wrapper;
 
     switch (ctx.vt_state) {
       case e_VT_STATE.WAITING: // waitting for loading data as soon, just return this as following.
@@ -819,6 +838,7 @@ class VTable extends React.Component<VTProps> {
     style.top = _offset_top;
     const { width, ...rest_style } = style;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const Table = ctx.components.table;
 
     return (
@@ -873,19 +893,18 @@ class VTable extends React.Component<VTProps> {
         break;
     }
 
-    // 0 - head, 2 - body
-    const children = this.props.children[2].props.children;
+    const data = get_data(this.props.children);
 
     if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
       /* `SUSPENDED` -> `WAITING` */
       ctx.vt_state = e_VT_STATE.WAITING;
 
-      if (children.length) {
+      if (data.length) {
         // just only switch to `RUNNING`.
         ctx.vt_state = e_VT_STATE.RUNNING;
       }
     } else {
-      if (children.length) {
+      if (data.length) {
         // `vt_state` is changed by `VTRow`.
         console.assert(ctx.vt_state === e_VT_STATE.LOADED);
         ctx.vt_state = e_VT_STATE.RUNNING | e_VT_STATE.PROTECTION;
@@ -921,7 +940,7 @@ class VTable extends React.Component<VTProps> {
 
     if (ctx.vt_state === e_VT_STATE.WAITING) {
       // Do you get the previous data back?
-      if (this.props.children[2].props.children.length) {
+      if (get_data(this.props.children).length) {
         // Y, `WAITING` -> `RUNNING`.
         ctx.vt_state = e_VT_STATE.RUNNING;
       } else {
@@ -1029,7 +1048,7 @@ class VTable extends React.Component<VTProps> {
       const offset = scroll_with_offset(
                        ctx,
                        scrollTop,
-                       this.props.children[2].props.children[0].props);
+                       ctx.scroll.y);
 
       head = offset[0];
       tail = offset[1];
@@ -1198,11 +1217,11 @@ function ASSERT_ID(id: number): void {
   console.assert(typeof id === "number" && id > 0);
 }
 
-function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
+function _set_components(ctx: VT_CONTEXT, components: TableComponents<any>): void {
   const { table, body, header } = components;
   ctx.components.body = { ...ctx.components.body, ...body };
-  if (body && body.cell) {
-    ctx._vtcomponents.body.cell = body.cell;
+  if (body && (body as body_t).cell) {
+    (ctx._vtcomponents.body as body_t).cell = (body as body_t).cell;
   } 
   if (header) {
     ctx.components.header = header;
@@ -1246,7 +1265,7 @@ function init_vt(id: number): VT_CONTEXT {
 
 
 export
-function VTComponents(vt_opts: vt_opts): TableComponents {
+function VTComponents<RecordType>(vt_opts: vt_opts<RecordType>): TableComponents<RecordType> {
   const inside = init_vt(vt_opts.id);
 
   Object.assign(
@@ -1266,7 +1285,7 @@ function VTComponents(vt_opts: vt_opts): TableComponents {
 }
 
 export
-function setComponents(id: number, components: TableComponents): void {
+function setComponents<RecordType>(id: number, components: TableComponents<RecordType>): void {
   _set_components(init_vt(id), components);
 }
 
