@@ -605,7 +605,7 @@ class VTWrapper extends React.Component<VTWrapperProps> {
 
     let trs: any[];
     let len = _children[1].length;
-    const children = _children[1];
+    const [measureRow, children] = _children;
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const Wrapper = (ctx.components.body as body_t).wrapper;
@@ -725,7 +725,12 @@ class VTWrapper extends React.Component<VTWrapperProps> {
       }
     }
 
-    return <Wrapper {...restProps}>{trs}</Wrapper>;
+    return (
+      <Wrapper {...restProps}>
+        {measureRow}
+        {trs}
+      </Wrapper>
+    );
   }
 
   public shouldComponentUpdate(nextProps: VTWrapperProps, nextState: any): boolean {
