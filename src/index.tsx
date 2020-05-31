@@ -9,6 +9,9 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
+import { TableComponents } from "rc-table/es/interface";
+import { vt_components, vt_scroll, _set_components, vt_opts, init } from "./vt";
+import { useOnce } from "./use";
 
 const _brower = 1;
 const _node = 2;
@@ -22,5 +25,42 @@ const _node = 2;
 })();
 
 
-export { VTComponents, VTScroll, setComponents } from "./vt";
-export { useVT } from "./hooks";
+/**
+ * @example
+ * 
+ * function MyTableComponent() {
+ * 
+ * // ... your code
+ * 
+ * 
+ * // `set_components` is the same as the setComponents, excepet for the param id.
+ * // `vt_scroll` is the same as the VTScroll, excepet for the param id.
+ * const [ vt, set_components, vt_scroll ] = useVT();
+ * 
+ * 
+ * return (
+ *  <Table
+ *   columns={columns}
+ *   dataSource={dataSource}
+ *   scroll={{ x: 1000, y: 600 }}
+ *   components={vt}
+ *  />
+ * );
+ * }
+ */
+function useVT<RecordType>(opts: vt_opts<RecordType>): [TableComponents<RecordType>,
+                                                       (components: TableComponents<RecordType>) => void,
+                                                       (param?: { top: number; left: number }) => {
+                                                         top: number;
+                                                         left: number;
+                                                       }]
+{
+  const ctx = useOnce(init);
+  const scroll = useOnce(() => (param?: { top: number; left: number }) => vt_scroll(ctx, param));
+  const set = useOnce(() => (components: TableComponents<RecordType>) => _set_components(ctx, components));
+  const vt = useOnce(() => vt_components(ctx, opts));
+
+  return [vt, set, scroll];
+}
+
+export { useVT };
