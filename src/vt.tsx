@@ -13,7 +13,6 @@ The above copyright notice and this permission notice shall be included in all c
 import * as React from "react";
 import { TableComponents, CustomizeComponent } from "rc-table/es/interface";
 import { TableProps as RcTableProps } from 'rc-table/es/Table';
-import { useMount, useOnce } from './use';
 
 const { useRef, useState, useCallback, useContext, useEffect, useMemo } = React;
 
@@ -121,6 +120,25 @@ interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
   _offset_tail: number/* int */;
 }
 
+
+function default_context<T>(): VT_CONTEXT<T> {
+  return {
+    vt_state: e_VT_STATE.INIT,
+    possible_hight_per_tr: -1,
+    computed_h: 0,
+    re_computed: 0,
+    row_height: [],
+    row_count: 0,
+    prev_row_count: 0,
+    PSRB: [-1, -1],
+    _keys2insert: 0,
+    _index_persister: new Set<number>(),
+    _offset_top: 0 | 0,
+    _offset_head: 0 | 0,
+    _offset_tail: 0 | 1,
+    WH: 0,                 // the wrapper's height
+  } as VT_CONTEXT<T>;
+}
 
 
 
@@ -288,9 +306,6 @@ function _set_offset(
 }
 
 function _Update_wrap_style(ctx: VT_CONTEXT, h: number): void {
-  // a component has unmounted.
-  if (!ctx.wrap_inst.current) return;
-
   if (ctx.vt_state === e_VT_STATE.WAITING) h = 0;
   ctx.wrap_inst.current.style.height = `${h}px`;
   ctx.wrap_inst.current.style.maxHeight = `${h}px`;
@@ -345,6 +360,9 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
     log_debug(ctx, "REPAINTING");
 
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
+      // a component has unmounted.
+      console.assert(ctx.wrap_inst.current !== null);
+
       // output to the buffer
       update_wrap_style(ctx, ctx.computed_h);
     }
@@ -419,31 +437,15 @@ interface VTableProps<T> extends React.FC {
 function VTable<T>(props: VTableProps<T>) {
   const { style, context, ...rest } = props;
 
-  /*********** inner context ************/
-  const _ctx = useRef({
-    vt_state: e_VT_STATE.INIT,
-    possible_hight_per_tr: -1,
-    computed_h: 0,
-    re_computed: 0,
-    row_height: [],
-    row_count: 0,
-    prev_row_count: 0,
-    PSRB: [-1, -1],
-    _keys2insert: 0,
-    _index_persister: new Set<number>(),
-    _offset_top: 0 | 0,
-    _offset_head: 0 | 0,
-    _offset_tail: 0 | 1,
-    WH: 0,                 // the wrapper's height
-  } as VT_CONTEXT<T>).current;
 
   /*********** context ************/
   const ctx = useContext(context);
-  const ctx_val = useRef(Object.assign(ctx, _ctx)).current;
+  useMemo(() => {
+    Object.assign(ctx, default_context<T>());
+  }, []);
 
   /*********** DOM ************/
-  const inst = React.createRef<HTMLTableElement>();
-  const wrap_inst = React.createRef<HTMLDivElement>();
+  const wrap_inst = useMemo(() => React.createRef<HTMLDivElement>(), []);
 
   // the state of scroll event
   const [scroll, setScroll] = useState({
@@ -473,7 +475,7 @@ function VTable<T>(props: VTableProps<T>) {
     }
 
     if (nevent_queue.length || event_queue.length) {
-      if (HND_RAF) cancelAnimationFrame(HND_RAF.current);
+      if (HND_RAF.current) cancelAnimationFrame(HND_RAF.current);
       // requestAnimationFrame, ie >= 10
       HND_RAF.current = requestAnimationFrame(RAF_update_self);
     }
@@ -579,15 +581,16 @@ function VTable<T>(props: VTableProps<T>) {
       case SCROLLEVT_NATIVE:
         log_debug(ctx, "SCROLLEVT_NATIVE");
 
+        HND_RAF.current = 0;
+        if (ctx.onScroll) {
+          ctx.onScroll({
+            top: scrollTop,
+            left: scrollLeft,
+            isEnd: e.end,
+          });
+        }
+
         if (head === prev_head && tail === prev_tail && top === prev_top) {
-          HND_RAF.current = 0;
-          if (ctx.onScroll) {
-            ctx.onScroll({
-              top: scrollTop,
-              left: scrollLeft,
-              isEnd: e.end,
-            });
-          }
           return;
         }
 
@@ -602,6 +605,12 @@ function VTable<T>(props: VTableProps<T>) {
     }
 
   }, []);
+
+
+  useEffect(() => {
+    ctx.wrap_inst = wrap_inst;
+    ctx.wrap_inst.current.parentElement.onscroll = scroll_hook;
+  }, [wrap_inst]);
 
 
   // update DOM style.
@@ -620,17 +629,6 @@ function VTable<T>(props: VTableProps<T>) {
         if (event_queue.length) scroll_hook(null); // consume the next.
         break;
 
-      case SCROLLEVT_NATIVE:
-        HND_RAF.current = 0;
-        if (ctx.onScroll) {
-          ctx.onScroll({
-            top: scroll.top,
-            left: scroll.left,
-            isEnd: scroll.end,
-          });
-        }
-        break;
-
       default:
         break;
     }
@@ -638,14 +636,9 @@ function VTable<T>(props: VTableProps<T>) {
 
 
   useEffect(() => {
-    ctx.wrap_inst = wrap_inst;
-  }, [wrap_inst.current]);
-
-
-  useEffect(() => {
     switch (ctx.vt_state) {
       case e_VT_STATE.INIT:
-        wrap_inst.current.parentElement.onscroll = scroll_hook;
+        // init vt without the rows.
         break;
 
       case e_VT_STATE.LOADED: // changed by VTRow only.
@@ -696,7 +689,7 @@ function VTable<T>(props: VTableProps<T>) {
 
 
   style.position = "relative";
-  style.top = _ctx._offset_top;
+  style.top = ctx._offset_top;
   const { width, ...rest_style } = style;
 
   const wrap_style = useMemo<React.CSSProperties>(
@@ -710,8 +703,8 @@ function VTable<T>(props: VTableProps<T>) {
       ref={wrap_inst}
       style={wrap_style}
     >
-      <context.Provider value={ctx_val}>
-        <Table {...rest} ref={inst} style={rest_style} />
+      <context.Provider value={{...ctx}}>
+        <Table {...rest} style={rest_style} />
       </context.Provider>
     </div>
   );
@@ -721,14 +714,12 @@ function VTable<T>(props: VTableProps<T>) {
 
 interface VWrapperProps<T> extends React.FC {
   style: React.CSSProperties;
-  context: React.Context<VT_CONTEXT<T>>;
+  ctx: VT_CONTEXT<T>;
   [prop: string]: any;
 }
 
 function VWrapper<T>(props: VWrapperProps<T>) {
-  const { children: [measureRow, rows], context, ...restProps } = props;
-
-  const ctx = useContext(context);
+  const { children: [measureRow, rows], ctx, ...restProps } = props;
 
   let { _offset_head: head, _offset_tail: tail } = ctx;
 
@@ -853,19 +844,10 @@ function VWrapper<T>(props: VWrapperProps<T>) {
 
 
   return (
-    <context.Consumer>
-      {
-        () => {
-          return (
-            <Wrapper {...restProps}>
-              {measureRow}
-              {trs}
-            </Wrapper>
-          );
-        }
-      }
-    </context.Consumer>
-
+    <Wrapper {...restProps}>
+      {measureRow}
+      {trs}
+    </Wrapper>
   );
 }
 
@@ -998,7 +980,15 @@ function init<T>(): VT_CONTEXT<T> {
   }, []);
 
   const VWrapperC = useCallback((props: any) => {
-    return <VWrapper<T> {...props} context={ctx}/>;
+    return (
+      <ctx.Consumer>
+        {(value) => {
+          return (
+            <VWrapper<T> {...props} ctx={ctx_value}/>
+          );
+        }}
+      </ctx.Consumer>
+    );
   }, []);
 
   const VRowC = useCallback((props: any) => {
@@ -1050,7 +1040,7 @@ function vt_components<T>(ctx: VT_CONTEXT<T>, vt_opts: vt_opts<T>): TableCompone
 
 
 export
-function vt_scroll<T>(ctx: VT_CONTEXT<T>, param?: { top: number; left: number }): { top: number; left: number } {
+function _vt_scroll<T>(ctx: VT_CONTEXT<T>, param?: { top: number; left: number }): { top: number; left: number } {
   try {
     return ctx.VTScroll(param);
   } catch {

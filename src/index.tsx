@@ -10,7 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 import { TableComponents } from "rc-table/es/interface";
-import { vt_components, vt_scroll, _set_components, vt_opts, init } from "./vt";
+import { vt_components, _vt_scroll, _set_components, vt_opts, init } from "./vt";
 import { useOnce } from "./use";
 
 const _brower = 1;
@@ -55,8 +55,8 @@ function useVT<RecordType>(opts: vt_opts<RecordType>): [TableComponents<RecordTy
                                                          left: number;
                                                        }]
 {
-  const ctx = useOnce(init);
-  const scroll = useOnce(() => (param?: { top: number; left: number }) => vt_scroll(ctx, param));
+  const ctx = init<RecordType>();
+  const scroll = useOnce(() => (param?: { top: number; left: number }) => _vt_scroll(ctx, param));
   const set = useOnce(() => (components: TableComponents<RecordType>) => _set_components(ctx, components));
   const vt = useOnce(() => vt_components(ctx, opts));
 
