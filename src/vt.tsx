@@ -143,7 +143,7 @@ function default_context<T>(): VT_CONTEXT<T> {
 
 
 /* overload __DIAGNOSIS__. */
-function helper_diagnosis(ctx: VT_CONTEXT): void {
+function helper_diagnosis<T>(ctx: VT_CONTEXT<T>): void {
   if (ctx.hasOwnProperty("CLICK~__DIAGNOSIS__")) return;
   Object.defineProperty(ctx, "CLICK~__DIAGNOSIS__", {
     get() {
@@ -305,18 +305,12 @@ function _set_offset(
   ctx._offset_tail = 0 | tail;
 }
 
-function _Update_wrap_style(ctx: VT_CONTEXT, h: number): void {
-  if (ctx.vt_state === e_VT_STATE.WAITING) h = 0;
-  ctx.wrap_inst.current.style.height = `${h}px`;
-  ctx.wrap_inst.current.style.maxHeight = `${h}px`;
-}
 
-
-/** non-block, just create a macro tack, then only update once. */
 function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
   if (ctx.WH === h) return;
   ctx.WH = h;
-  _Update_wrap_style(ctx, h);
+  ctx.wrap_inst.current.style.height = `${h}px`;
+  ctx.wrap_inst.current.style.maxHeight = `${h}px`;
 }
 
 
@@ -359,10 +353,7 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
   const fn = (): void => {
     log_debug(ctx, "REPAINTING");
 
-    if (ctx.vt_state === e_VT_STATE.RUNNING) {
-      // a component has unmounted.
-      console.assert(ctx.wrap_inst.current !== null);
-
+    if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.wrap_inst.current) {
       // output to the buffer
       update_wrap_style(ctx, ctx.computed_h);
     }
@@ -371,8 +362,7 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
     ctx.HND_PAINT = 0;
   }
 
-  if (ms < 0) return window.requestAnimationFrame(fn);
-  return window.setTimeout(fn, ms);
+  return ms < 0 ? window.requestAnimationFrame(fn) : window.setTimeout(fn, ms);
 }
 
 
@@ -437,15 +427,20 @@ interface VTableProps<T> extends React.FC {
 function VTable<T>(props: VTableProps<T>) {
   const { style, context, ...rest } = props;
 
+  /*********** DOM ************/
+  const wrap_inst = useMemo(() => React.createRef<HTMLDivElement>(), []);
 
   /*********** context ************/
   const ctx = useContext(context);
   useMemo(() => {
     Object.assign(ctx, default_context<T>());
+    if (ctx.wrap_inst && ctx.wrap_inst.current) {
+      ctx.wrap_inst.current.parentElement.onscroll = null;
+    }
+    ctx.wrap_inst = wrap_inst;
+    helper_diagnosis<T>(ctx);
   }, []);
 
-  /*********** DOM ************/
-  const wrap_inst = useMemo(() => React.createRef<HTMLDivElement>(), []);
 
   // the state of scroll event
   const [scroll, setScroll] = useState({
@@ -466,6 +461,8 @@ function VTable<T>(props: VTableProps<T>) {
 
   /*********** scroll hook ************/
   const scroll_hook = useCallback((e: any) => {
+    if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
+
     if (e) {
       if (e.flag) {
         event_queue.push(e);
@@ -483,9 +480,7 @@ function VTable<T>(props: VTableProps<T>) {
 
   /* requestAnimationFrame callback */
   RAF_update_self = useCallback((timestamp: number) => {
-    if (!(ctx.vt_state & e_VT_STATE.RUNNING)) {
-      return;
-    }
+    if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
 
     const nevq = nevent_queue,
           evq  = event_queue;
@@ -608,7 +603,6 @@ function VTable<T>(props: VTableProps<T>) {
 
 
   useEffect(() => {
-    ctx.wrap_inst = wrap_inst;
     ctx.wrap_inst.current.parentElement.onscroll = scroll_hook;
   }, [wrap_inst]);
 
@@ -721,15 +715,23 @@ interface VWrapperProps<T> extends React.FC {
 function VWrapper<T>(props: VWrapperProps<T>) {
   const { children: [measureRow, rows], ctx, ...restProps } = props;
 
-  let { _offset_head: head, _offset_tail: tail } = ctx;
-
-  let trs: any[];
-  const children = Array.isArray(rows) ? rows : []; // emptyNode if the rows isn't exists.
-  let len = children.length;
-
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const Wrapper = (ctx.components.body as body_t).wrapper;
+
+  if (!Array.isArray(rows)) {
+    // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L66
+    // emptyNode if these rows are not array.
+    return (
+      <Wrapper {...restProps}>
+        {measureRow}
+        {rows}
+      </Wrapper>
+    );
+  }
+
+  let { _offset_head: head, _offset_tail: tail } = ctx;
+  const children = rows;
+  let len = children.length;
+  let trs: any[];
 
   switch (ctx.vt_state) {
     // waitting for loading data as soon, just returns this as following.
@@ -868,6 +870,11 @@ function VTRow<T>(props: VRowProps<T>) {
 
   const children = props.children;
 
+  if (!Array.isArray(children)) {
+    // reference https://github.com/react-component/table/blob/master/src/Body/ExpandedRow.tsx#L55
+    return children;
+  }
+
   const index: number = children[0].props.index;
   const last_index = useRef<number>(children[0].props.index);
 
@@ -995,7 +1002,7 @@ function init<T>(): VT_CONTEXT<T> {
     return <VTRow<T> {...props} context={ctx_value} />;
   }, []);
 
-  if (!ctx_value._vtcomponents) {
+  useMemo(() => {
     // set the virtual layer.
     ctx_value._vtcomponents = {
       table: VTableC,
@@ -1015,7 +1022,8 @@ function init<T>(): VT_CONTEXT<T> {
     });
     // start -> `INIT`
     ctx_value.vt_state = e_VT_STATE.INIT;
-  }
+  }, []);
+
   return ctx_value;
 }
 
