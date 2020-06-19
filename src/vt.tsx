@@ -35,6 +35,7 @@ interface vt_opts<RecordType> {
   onScroll?: ({ left, top, isEnd, }:
     { top: number; left: number; isEnd: boolean }) => void;
 
+  initTop?: number;
 
   /**
    * @default false
@@ -94,8 +95,6 @@ interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
 
   HND_PAINT: number;      // a handle for Batch Repainting.
 
-  /* stores [begin, end], `INIT`: [-1, -1] */
-  PSRB: number[]; // represents the Previous Shadow-Rows Below `trs`.
 
   /* render with React. */
   _keys2insert: number; // a number of indexes.
@@ -130,7 +129,6 @@ function default_context<T>(): VT_CONTEXT<T> {
     row_height: [],
     row_count: 0,
     prev_row_count: 0,
-    PSRB: [-1, -1],
     _keys2insert: 0,
     _index_persister: new Set<number>(),
     _offset_top: 0 | 0,
@@ -373,40 +371,21 @@ function repainting(ctx: VT_CONTEXT): void {
 }
 
 
-/** Shadow Rows. */
-function srs_diff(
-  ctx: VT_CONTEXT, PSR: number[],
-  head: number, tail: number, // the range[head, tail) of the DOMs to render.
-  begin: number, end: number, prev_begin: number, prev_end: number): void {
+function srs_expand(ctx: VT_CONTEXT, len: number, prev_len: number, fill_value: number): void {
+  const slen = len - prev_len;
+  const shadow_rows = new Array(slen).fill(fill_value);
+  ctx.row_height = ctx.row_height.concat(shadow_rows);
+  ctx.computed_h += slen * fill_value;
+}
 
-  const { row_height, possible_hight_per_tr } = ctx;
 
-  if (begin > prev_begin) {
-    for (let i = prev_begin; i < begin; ++i) {
-      if (i >= head && i < tail) continue;
-      free_h(ctx, i, "shadow");
-    }
-  } else if (begin < prev_begin) {
-    for (let i = begin; i < prev_begin; ++i) {
-      if (i >= head && i < tail) continue;
-      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
-    }
+function srs_shrink(ctx: VT_CONTEXT, len: number, prev_len: number): void {
+  const rows = ctx.row_height;
+  let h2shrink = 0;
+  for (let i = len; i < prev_len; ++i) {
+    h2shrink += rows[i];
   }
-
-  if (end > prev_end) {
-    for (let i = prev_end; i < end; ++i) {
-      if (i >= head && i < tail) continue;
-      add_h(ctx, i, row_height[i] || possible_hight_per_tr, "shadow");
-    }
-  } else if (end < prev_end) {
-    for (let i = end; i < prev_end; ++i) {
-      if (i >= head && i < tail) continue;
-      free_h(ctx, i, "shadow");
-    }
-  }
-
-  PSR[0] = begin;
-  PSR[1] = end;
+  ctx.computed_h -= h2shrink;
 }
 
 
@@ -444,7 +423,7 @@ function VTable<T>(props: VTableProps<T>) {
 
   // the state of scroll event
   const [scroll, setScroll] = useState({
-    top: 0, left: 0,
+    top: ctx.initTop, left: 0,
     flag: SCROLLEVT_NULL,
     end: false,
   });
@@ -611,12 +590,6 @@ function VTable<T>(props: VTableProps<T>) {
   useEffect(() => {
     switch (scroll.flag) {
       case SCROLLEVT_INIT:
-        console.assert(scroll.top === 0 && scroll.left === 0);
-        scroll_to(ctx, scroll.top, scroll.left);
-        HND_RAF.current = 0;
-        if (event_queue.length) scroll_hook(null); // consume the next.
-        break;
-
       case SCROLLEVT_RECOMPUTE:
         scroll_to(ctx, scroll.top, scroll.left);
         HND_RAF.current = 0;
@@ -638,9 +611,9 @@ function VTable<T>(props: VTableProps<T>) {
       case e_VT_STATE.LOADED: // changed by VTRow only.
         ctx.vt_state = e_VT_STATE.RUNNING;
 
-        // force update for initialization
+        // force update.
         scroll_hook({
-          target: { scrollTop: 0, scrollLeft: 0 },
+          target: { scrollTop: scroll.top, scrollLeft: 0 },
           flag: SCROLLEVT_INIT,
         });
         break;
@@ -748,13 +721,12 @@ function VWrapper<T>(props: VWrapperProps<T>) {
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
+        srs_expand(ctx, len, 0, 0);
       }
       break;
 
     case e_VT_STATE.RUNNING: {
       let offset = 0;
-      const last_head = ctx._offset_head;
-      const last_tail = ctx._offset_tail;
       if (tail > len) {
         offset = tail - len;
         tail -= offset;
@@ -766,8 +738,6 @@ function VWrapper<T>(props: VWrapperProps<T>) {
           ctx._offset_top/* NOTE: invalided param, just to fill for this param */,
           head, tail);
       }
-
-      const { PSRB } = ctx;
 
       if (ctx.row_count !== len) {
         set_tr_cnt(ctx, len);
@@ -796,43 +766,10 @@ function VWrapper<T>(props: VWrapperProps<T>) {
         trs = children.slice(head, tail);
       }
 
-      /**
-       * start srs_diff phase.
-       * first up, Previous-Shadow-Rows below `trs`,
-       * then Previous-Shadow-Rows above `trs`.
-       */
-      let fixed_PSRB0 = PSRB[0] - offset;
-      if (fixed_PSRB0 < 0) fixed_PSRB0 = 0;
-
-      /* PSR's range: [begin, end) */
-      if (PSRB[0] === -1) {
-        // init Rows.
-        const rows = new Array(tail - 1/* substract the first row */).fill(0, 0, tail - 1);
-        ctx.row_height = ctx.row_height.concat(rows);
-        // init Shadow Rows.
-        const shadow_rows = new Array(len - tail).fill(ctx.possible_hight_per_tr, 0, len - tail);
-        ctx.row_height = ctx.row_height.concat(shadow_rows);
-        ctx.computed_h = ctx.computed_h + ctx.possible_hight_per_tr * (len - tail);
-
-        PSRB[0] = tail;
-        PSRB[1] = len;
-      } else {
-        if (len < prev_len) {
-          /* free some rows */
-          srs_diff(
-            ctx, PSRB,
-            last_head, last_tail,
-            tail, len, fixed_PSRB0, PSRB[1]);
-        } else if (len > prev_len) {
-          /* insert some rows */
-          srs_diff(
-            ctx, PSRB,
-            last_head, last_tail,
-            tail, len, PSRB[0], PSRB[1]);
-        } else {
-          PSRB[0] = tail;
-          PSRB[1] = len;
-        }
+      if (len < prev_len) {
+        srs_shrink(ctx, len, prev_len);
+      } else if (len > prev_len) {
+        srs_expand(ctx, len, prev_len, ctx.possible_hight_per_tr);
       }
 
       ctx.prev_row_count = ctx.row_count;
@@ -878,80 +815,41 @@ function VTRow<T>(props: VRowProps<T>) {
   const index: number = children[0].props.index;
   const last_index = useRef<number>(children[0].props.index);
 
-
   useEffect(() => {
-    if (ctx.vt_state === e_VT_STATE.INIT) {
-      ctx.vt_state = e_VT_STATE.LOADED;
-      const h = inst.current.offsetHeight;
-      if (ctx.possible_hight_per_tr === -1) {
-        /* assign only once */
-        ctx.possible_hight_per_tr = h;
-      }
-      ctx.computed_h = 0; // reset initial value.
-      add_h(ctx, index, h, "dom");
-      // create a timeout task.
-      _repainting(ctx, 16);
-    } else if (ctx.vt_state === e_VT_STATE.RUNNING) {
-      ctx._index_persister.delete(index);
-      if (ctx.re_computed >= 0) {
-        apply_h(ctx, index, inst.current.offsetHeight, "dom");
-      } else {
-        // the row moved to another index, so don't need to call `apply_h`.
-        // udpate this height at the index directly.
-        const h = inst.current.offsetHeight;
-        const last_h = ctx.row_height[last_index.current];
-  
-        if (last_index.current >= ctx._offset_tail) {
-          // need to free. so
-          // first, free the current height at the index.
-          ctx.computed_h -= ctx.row_height[index];
-          // then, move and update the height.
-          ctx.computed_h += h - last_h;
-          // finaly, update the height at the index to ctx.row_height.
-          ctx.row_height[index] = h;
-        } else {
-          // move and update the height.
-          ctx.computed_h += h - last_h;
-          // finaly, update the height at the index to ctx.row_height.
-          ctx.row_height[index] = h;
-        }
-  
-        if (last_index.current !== index) {
-          // free the height of the row at the last index to easy to mount a new row.
-          ctx.row_height[last_index.current] = 0;
-          last_index.current = index;
-        }
-      }
+    if (ctx._index_persister.delete(index)) {
+      return;
+    }
+
+    if (ctx.vt_state === e_VT_STATE.RUNNING) {
+      // apply_h(ctx, index, inst.current.offsetHeight, "dom");
       repainting(ctx);
     } else {
-      console.assert(false); // it will never happen.
+      /* init context */
+      console.assert(ctx.vt_state === e_VT_STATE.INIT);
+      ctx.vt_state = e_VT_STATE.LOADED;
+      ctx.possible_hight_per_tr = inst.current.offsetHeight;
+      // create a timeout task.
+      _repainting(ctx, 16);
     }
 
+    return () => repainting(ctx);
+  }, []);
 
-    // cleanup
-    return () => {
-      // `RUNNING` -> `SUSPENDED`
-      if (ctx.vt_state === e_VT_STATE.SUSPENDED) {
-        ctx._index_persister.add(index);
-        return;
-      }
-  
-      if (ctx._keys2insert > 0) {
-        ctx._keys2insert--;
-        // nothing to do... just return.
-        return;
-      }
-  
-      if (ctx.re_computed >= 0) {
-        // scrolling or added some rows... just return.
-        return;
-      }
-  
-      free_h(ctx, index, "dom");
-      repainting(ctx);
-    }
-  }, [inst.current, index]);
 
+  useEffect(() => {
+    ctx._index_persister.delete(index);
+
+    const h = inst.current.offsetHeight;
+    const curr_h = ctx.row_height[index];
+    const last_h = ctx.row_height[last_index.current];
+
+    ctx.computed_h -= curr_h;
+    ctx.computed_h += last_h;
+    ctx.computed_h += h - last_h;
+    ctx.row_height[index] = h;
+
+    repainting(ctx);
+  });
 
   const Row = (ctx.components.body as body_t).row;
   return <Row {...rest} ref={inst} />;
@@ -989,7 +887,7 @@ function init<T>(): VT_CONTEXT<T> {
   const VWrapperC = useCallback((props: any) => {
     return (
       <ctx.Consumer>
-        {(value) => {
+        {(/* value */) => {
           return (
             <VWrapper<T> {...props} ctx={ctx_value}/>
           );
@@ -1034,6 +932,7 @@ function vt_components<T>(ctx: VT_CONTEXT<T>, vt_opts: vt_opts<T>): TableCompone
   Object.assign(
     ctx,
     {
+      initTop: 0,
       overscanRowCount: 5,
       debug: false,
     } as VT_CONTEXT,
