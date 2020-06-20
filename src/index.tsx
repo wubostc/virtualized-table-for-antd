@@ -53,7 +53,7 @@ export function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  * );
  * }
  */
-function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>, deps?: React.DependencyList):
+function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>, deps: React.DependencyList = []):
   [TableComponents<RecordType>,
   (components: TableComponents<RecordType>) => void]
 {
