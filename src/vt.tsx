@@ -18,7 +18,7 @@ const { useRef, useState, useCallback, useContext, useEffect, useMemo } = React;
 
 export
 interface vt_opts<RecordType> {
-  readonly id?: number;
+  id?: number;
   /**
    * @default 5
    */
