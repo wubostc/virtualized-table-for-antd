@@ -11,7 +11,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 import { useRef, useMemo } from "react";
 import { TableComponents } from "rc-table/es/interface";
-import { vt_components, _vt_scroll, _set_components, vt_opts, init } from "./vt";
+import { vt_components, _set_components, vt_opts, init } from "./vt";
 
 const _brower = 1;
 const _node = 2;
@@ -55,19 +55,14 @@ export function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  */
 function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>, deps?: React.DependencyList):
   [TableComponents<RecordType>,
-  (components: TableComponents<RecordType>) => void,
-  (param?: { top: number; left: number }) => {
-    top: number;
-    left: number;
-  }]
+  (components: TableComponents<RecordType>) => void]
 {
   const opts = useMemo(() => (Object.assign({ id: +new Date() }, fnOpts())), deps);
   const ctx = init<RecordType>();
-  const scroll = useOnce(() => (param?: { top: number; left: number }) => _vt_scroll(ctx, param));
   const set = useOnce(() => (components: TableComponents<RecordType>) => _set_components(ctx, components));
   const vt = useMemo(() => vt_components(ctx, opts), [opts]);
 
-  return [vt, set, scroll];
+  return [vt, set];
 }
 
 export { useVT };

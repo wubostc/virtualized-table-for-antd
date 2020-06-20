@@ -92,13 +92,6 @@ interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
   HND_PAINT: number;      // a handle for Batch Repainting.
 
 
-  /* render with React. */
-  _keys2insert: number; // a number of indexes.
-
-  // persistent stroage index when switch `RUNNING` to `SUSPENDED`.
-  // it will prevent to change the `ctx._computed_h`.
-  _index_persister: Set<number/* index */>;
-
   // stores the variables for the offset following.
   //  |
   //  |
@@ -125,8 +118,6 @@ function default_context<T>(): VT_CONTEXT<T> {
     row_height: [],
     row_count: 0,
     prev_row_count: 0,
-    _keys2insert: 0,
-    _index_persister: new Set<number>(),
     _offset_top: 0 | 0,
     _offset_head: 0 | 0,
     _offset_tail: 0 | 1,
@@ -713,10 +704,6 @@ function VTRow<T>(props: VRowProps<T>) {
   const last_index = useRef<number>(children[0].props.index);
 
   useEffect(() => {
-    if (ctx._index_persister.delete(index)) {
-      return;
-    }
-
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
       // apply_h(ctx, index, inst.current.offsetHeight, "dom");
       repainting(ctx);
@@ -734,8 +721,6 @@ function VTRow<T>(props: VRowProps<T>) {
 
 
   useEffect(() => {
-    ctx._index_persister.delete(index);
-
     const h = inst.current.offsetHeight;
     const curr_h = ctx.row_height[index];
     const last_h = ctx.row_height[last_index.current];
@@ -841,12 +826,3 @@ function vt_components<T>(ctx: VT_CONTEXT<T>, vt_opts: vt_opts<T>): TableCompone
   return ctx._vtcomponents;
 }
 
-
-export
-function _vt_scroll<T>(ctx: VT_CONTEXT<T>, param?: { top: number; left: number }): { top: number; left: number } {
-  try {
-    return ctx.VTScroll(param);
-  } catch {
-    throw new Error(`[${0}]You haven't initialized this VT yet.`);
-  }
-}
