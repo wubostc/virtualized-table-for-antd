@@ -10,7 +10,7 @@
  * copy this file to your working directory.
  */
 import React, { useRef, useEffect, useMemo } from 'react';
-import { Table, Form } from 'antd';
+import { Table } from 'antd';
 
 import { useVT } from 'virtualizedtableforantd';
 
@@ -56,13 +56,9 @@ function CustomRowsHooks() {
     },
   ]);
 
-  const [VT, setVT, VTScroll] = useVT({ debug: true });
+  const [VT, setVT] = useVT(() => ({ scroll: { y: 500 }, debug: true }));
 
   useMemo(() => setVT({ body: { row: MyRow } }), [setVT]);
-
-  useEffect(() => {
-    VTScroll({ top: 233 });
-  }, [VTScroll]);
 
   return (
     <Table

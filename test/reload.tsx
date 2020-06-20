@@ -2,9 +2,8 @@
  * copy this file to your working directory.
  */
 import React, { useState, useMemo, useCallback, useRef, useContext, useEffect, } from 'react';
-import { Table, Button, Input, Switch, Modal, Checkbox } from 'antd';
-import { VTComponents, VTScroll, } from '../../virtualized-table-for-antd';
-import { isNumber } from 'util';
+import { Table, Button } from 'antd';
+import { useVT } from 'virtualizedtableforantd';
 import { Switch as RouteSwitch, Route, NavLink } from 'react-router-dom';
 
 
@@ -28,17 +27,6 @@ function Table1({ ctx }: { ctx: any} ) {
 
   const [data, setData] = useState([]);
 
-  useEffect(() => {
-    // load data from net...
-    setTimeout(() => {
-      setData(_data);
-      VTScroll(2, { top: ctx.top || 0, left: 0 });
-    }, 1000);
-
-    // setData(_data);
-    // VTScroll(2, { top: ctx.top || 0, left: 0 });
-
-  }, []);
 
   // Column name age 1 2 3 4 5 6 7 8 operation
   const _columns: any = useMemo(() => [
@@ -104,14 +92,22 @@ function Table1({ ctx }: { ctx: any} ) {
 
   ], []);
 
-  // reload
-  useEffect(() => {
-  
-    return () => {
-      const loc = VTScroll(2);
-      ctx.top = loc.top;
+
+  const [vt] = useVT(() => {
+    return {
+      initTop: ctx.top,
+      onScroll: ({ top }) => ctx.top = top,
+      scroll: { y: 500 },
+      debug: true,
     }
-  }, [ctx]);
+  }, [ctx.top]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      window.alert('fetching the data...');
+      setData(_data);
+    }, 50);
+  }, []);
 
 
   return (
@@ -129,13 +125,7 @@ function Table1({ ctx }: { ctx: any} ) {
         columns={_columns}
         dataSource={data}
         scroll={{ y: 500, x: 1500 }}
-        components={
-          VTComponents({
-            id: 2, debug: true, onScroll: ({ left, top }) => {
-              ctx.top = top;
-              // ctx.left = left;
-            }
-        })}
+        components={vt}
         pagination={false}
       >
       </Table>
@@ -146,7 +136,7 @@ function Table1({ ctx }: { ctx: any} ) {
 
 export default function Reload() {
 
-  const ctx = useRef({});
+  const ctx = useRef({ top: 0 });
 
   return (
     <RouteSwitch>

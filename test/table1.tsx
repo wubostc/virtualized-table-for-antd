@@ -3,7 +3,7 @@
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Table, Button, Input, Switch, Modal, Checkbox } from 'antd';
-import { VTComponents, VTScroll, } from '../../virtualized-table-for-antd';
+import { useVT } from 'virtualizedtableforantd';
 import { isNumber } from 'util';
 
 
@@ -16,43 +16,38 @@ function rndstr(str: string) {
   return s;
 }
 
-export default function Table1() {
-  
 
-  const myajax = useCallback(() => {
-    const data: any[] = [];
-    for (let i = 0; i < 970; i++) {
-      const n = 0 | Math.random() * 3000 + 1000;
-      data.push({
-        key: i,
-        name: `Edrward ${n}`,
-        age: 0 | Math.random() * 88 + 12,
-        address: rndstr(`London Park no. ${n}`),
-      });
-    }
-
-    return new Promise<any[]>((resolve, reject) => {
-      setTimeout(() => {
-        resolve(data);
-      }, Math.random() * 200 + 100);
+const myajax = (() => {
+  const data: any[] = [];
+  const len = 0 | (Math.random() * 2000);
+  for (let i = 0; i < len; i++) {
+    const n = 0 | Math.random() * 3000 + 1000;
+    data.push({
+      key: i,
+      name: `Edrward ${n}`,
+      age: 0 | Math.random() * 88 + 12,
+      address: rndstr(`London Park no. ${n}`),
     });
-  }, []);
+  }
 
+  return new Promise<any[]>((resolve, reject) => {
+    setTimeout(() => {
+      resolve(data);
+    }, Math.random() * 200 + 100);
+  });
+});
 
-  const _data = useMemo(() => {
-    const data: any[] = [];
-    for (let i = 0; i < 1000; i++) {
-      data.push({
-        key: i,
-        name: `Edrward ${i}`,
-        age: 32,
-        address: rndstr(`London Park no. ${i}`),
-      });
-    }
-    return data;
-  }, []);
+const _data: any[] = [];
+for (let i = 0; i < 1000; i++) {
+  _data.push({
+    key: i,
+    name: `Edrward ${i}`,
+    age: 32,
+    address: rndstr(`London Park no. ${i}`),
+  });
+}
 
-
+export default function Table1() {
   const [data, setData] = useState(_data);
   const [rowKeys, setSelectedRowKeys] = useState([]);
   const [showPagination, setPagination] = useState(false);
@@ -68,24 +63,25 @@ export default function Table1() {
   const [age, setAge] = useState<number>();
   const [key, setKey] = useState<string>();
 
+  const aaa = data;
 
-  const showDeleteConfirm = useCallback((record: any, data: any[]) => {
+  const showDeleteConfirm = (record: any) => {
     Modal.confirm({
       title: 'Are you sure delete this record?',
       content: 'Some descriptions',
       okText: 'Yes',
       okType: 'danger',
       cancelText: 'No',
-      onOk() {
-        const arr = data.filter((v) => {
+      onOk: () => {
+        const arr = aaa.filter((v) => {
           return v.key !== record.key;
         });
-        setData(arr);
+        setData([...arr]);
       },
       onCancel() {
       },
     });
-  }, [setData]);
+  };
 
 
   const record = useRef<any>();
@@ -96,7 +92,7 @@ export default function Table1() {
   }, [setVisibleOfUpdateModal, setText]);
 
   // Column name age 1 2 3 4 5 6 7 8 operation
-  const _columns = useMemo(() => [
+  const _columns = [
     {
       title: 'Full Name',
       width: 150,
@@ -162,12 +158,12 @@ export default function Table1() {
           <>
             <a onClick={() => showUpdateDialog(record)}>update</a>
             |
-            <a onClick={() => showDeleteConfirm(record, data)}>delete</a>
+            <a onClick={() => showDeleteConfirm(record)}>delete</a>
           </>
         );
       },
     },
-  ], [data]);
+  ];
 
   // columns
   const [checkedColumns, setCheckedColumns] = useState(["name", "age", "1", "2", "3", "4", "operation"]);
@@ -182,6 +178,12 @@ export default function Table1() {
   const [height, setHeight] = useState<string | number>(500);
   const [overscanRowCount, setOverscanRowCount] = useState(5);
   const [destroy, setDestroy] = useState(false);
+
+  const [vt] = useVT<any>(() => Object.assign({
+    scroll: { y: height },
+    debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */
+  },
+  overscanRowCount ? { overscanRowCount } : null));
 
   return (
     <>
@@ -308,7 +310,7 @@ export default function Table1() {
         }]}
         value={checkedColumnsFixed}
         onChange={(checkedValue: string[]) => {
-          setCheckedColumnsFixed(checkedValue);
+          setCheckedColumnsFixed(checkedValue as any);
           const fixed: any = {
             "name": "left",
             "age": "left",
@@ -404,12 +406,7 @@ export default function Table1() {
         columns={columns}
         dataSource={data}
         scroll={{ y: height, x: 1600 }}
-        components={
-          VTComponents(Object.assign({
-            id: 1, debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */
-          },
-          overscanRowCount ? { overscanRowCount } : null))
-        }
+        components={vt}
         pagination={
           showPagination ?
           {
