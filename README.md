@@ -1,55 +1,46 @@
-# The virtualized table component for Ant Design，fast and restorable.
+# The virtualized table component for AntD4，fast and restorable.
 
 
-![npm](https://img.shields.io/npm/v/virtualizedtableforantd)
-![npm](https://img.shields.io/npm/dm/virtualizedtableforantd)
+![npm](https://img.shields.io/npm/v/virtualizedtableforantd4)
+![dm](https://img.shields.io/npm/dm/virtualizedtableforantd4)
+![license](https://img.shields.io/npm/l/virtualizedtableforantd4)
+
+
+[![NPM](https://nodei.co/npm/virtualizedtableforantd4.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/virtualizedtableforantd4/)
 
 + Install
 
-[![NPM](https://nodei.co/npm/virtualizedtableforantd.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/virtualizedtableforantd/)
   ```shell
-  npm i --save virtualizedtableforantd
+  npm i --save virtualizedtableforantd4
   ```
 
-+ All interfaces([hooks](#hooks) added in v0.7.x)
++ the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
   ```typescript
-
-  // the param of the func VTComponents.
-  interface vt_opts extends Object {
-      readonly id: number;
+  export interface vt_opts<RecordType> {
+      id?: number;
       /**
-       * @default 5
+      * @default 5
       */
       overscanRowCount?: number;
       /**
-       * wheel event(only works on native events).
-       * 滚轮事件（只对原生事件有效）。
-       */
+      * this only needs the scroll.y
+      */
+      scroll: RcTableProps<RecordType>['scroll'];
+      /**
+      * wheel event(only works on native events).
+      * 滚轮事件（只对原生事件有效）。
+      */
       onScroll?: ({ left, top, isEnd, }: {
           top: number;
           left: number;
           isEnd: boolean;
       }) => void;
+      initTop?: number;
       /**
-       * @default false
-      */
-      destroy?: boolean;
-      /**
-       * @default false
+      * @default false
       */
       debug?: boolean;
   }
-
-  /* all APIs */
-  export declare function VTComponents(vt_opts: vt_opts): TableComponents;
-  export declare function setComponents(id: number, components: TableComponents): void;
-  export declare function VTScroll(id: number, param?: {
-      top: number;
-      left: number;
-  }): {
-      top: number;
-      left: number;
-  };
   ```
 
 
@@ -67,239 +58,32 @@
   ```typescript
   import React from 'react';
   import { Table } from 'antd';
-  import { VTComponents } from 'virtualedtableforantd';
+  import { VTComponents } from 'virtualedtableforantd4';
 
-  // using in the antd table
+  const [ vt, set_components ] = useVT(() => ({ scroll: { y: 600 } }), []);
+
   <Table
-    scroll={{ y: 500 }} // it's important for using VTComponents!!!
-    components={
-      VTComponents({
-        id: 1000,    /*the id is immutable*/
-      })
-    }
+    scroll={{ y: 600 }} // It's important for using VT!!! DO NOT FORGET!!!
+    components={vt}
     columns={/*your columns*/}
     dataSource={/*your data*/}
   />
   ```
 
 
-+ Restoring last state ([including hooks version](#restoring-hook))
-  ```typescript
-  import React, { PureComponent, useEffect } from 'react';
-  import { Table } from 'antd';
++ Restoring last state
 
-  const ctx = { top: 0 };
-
-  /* Class version. */
-  class Users extends PureComponent {
-    constructor(...args) {
-      super(...args);
-    }
-
-    render() {
-      return (
-        <Table
-          scroll={{ y: 500 }}
-          components={VTComponents({
-            id: 1000,
-            onScoll: ({ left, top }) => ctx.top = top
-            })
-          }
-        />
-      );
-    }
-
-    componentDidMount() {
-      VTScroll(1000, { top: ctx.top });
-    }
-
-    componentWillUnmount() {
-      ctx.top = VTScroll(1000).top;
-    }
-  }
-  ```
-
-<a id="restoring-hooks"></a>
-
-  ```typescript
-  /* Hooks version. */
-  import React, { useEffect } from 'react';
-  import { Table } from 'antd';
-  import { useVT } from 'virtualedtableforantd';
-
-  const ctx = { top: 0 };
-  function Users() {
-
-    const [
-      VT,
-      setComponents, // no longer needs the param id.
-      VTScroll,      // no longer needs the param id.
-      ] = useVT({ onScoll: ({ left, top }) => ctx.top = top });
-
-    useEffect(() => {
-      VTScroll({ top: ctx.top });
-
-      return () => ctx.top = VTScroll().top;
-    }, []);
-
-    return (
-      <Table
-        scroll={{ y: 500 }}
-        components={VT}
-        columns={/*your columns*/}
-        dataSource={/*your dataSource*/}
-      />
-    );
-  }
-
-  //--------- About
-  function About() {
-    return "About...";
-  }
-
-  function App() {
-    return (
-      <>
-        <NavLink to={'/users'}>Users</NavLink>
-        <NavLink to={'/about'}>About</NavLink>
-        <Switch>
-          <Route component={Users} path="/users" />
-          <Route component={About} path="/about" />
-        </Switch>
-      </>
-    );
-  }
-  ```
+  - [reload](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/reload.tsx)
 
 
 + Editable Table
 
-  > there are 3 examples following:
-    - [CustomRows](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/CustomRows.jsx)
-    - [CustomRows Hooks](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/CustomRows%20Hooks.jsx)
-    - [Editable Rows](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/Editable%20Rows.jsx)
+  - [CustomRows Hooks](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/CustomRows%20Hooks.jsx)
+  - [Editable Rows](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/Editable%20Rows.jsx)
 
++ Drag soring
 
-
-+ support column.fixed
-  ```typescript
-
-  const columns = [
-    {
-      title: 'Full Name',
-      width: 100,
-      dataIndex: 'name',
-      key: 'name',
-      fixed: 'left',
-    },
-    {
-      title: 'Age',
-      width: 100,
-      dataIndex: 'age',
-      key: 'age',
-      fixed: 'left',
-    },
-    {
-      title: 'Column 1',
-      dataIndex: 'address',
-      key: '1',
-      width: 150,
-    },
-    {
-      title: 'Column 2',
-      dataIndex: 'address',
-      key: '2',
-      width: 150,
-    },
-    {
-      title: 'Column 3',
-      dataIndex: 'address',
-      key: '3',
-      width: 150,
-    },
-    {
-      title: 'Column 4',
-      dataIndex: 'address',
-      key: '4',
-      width: 150,
-    },
-    {
-      title: 'Column 5',
-      dataIndex: 'address',
-      key: '5',
-      width: 150,
-    },
-    {
-      title: 'Column 6',
-      dataIndex: 'address',
-      key: '6',
-      width: 150,
-    },
-    {
-      title: 'Column 7',
-      dataIndex: 'address',
-      key: '7',
-      width: 150,
-    },
-    { title: 'Column 8', dataIndex: 'address', key: '8' },
-    {
-      title: 'Action',
-      key: 'operation',
-      fixed: 'right',
-      width: 100,
-      render: => 'Action',
-    },
-  ];
-
-  const data = [];
-  for (let i = 0; i < 100; i++) {
-    data.push({
-      key: i,
-      name: `Edrward ${i}`,
-      age: 32,
-      address: `London Park no. ${i}`,
-    });
-  }
-
-
-  function renderTable() {
-    return (
-      <Table
-        columns={columns}
-        dataSource={data}
-        scroll={{ x: 1500, y: 300 }}
-        components={VTComponents({ id: 1000 })}
-      />
-    );
-  }
-
-  ```
-
-
-<a id="hooks"></a>
-
-+ Hooks APIs(new)
-  ```typescript
-  
-  function MyTable() {
-    const [
-      VT,
-      setComponents, // no longer needs the param id.
-      VTScroll,      // no longer needs the param id.
-      ] = useVT(/*the same as `vt_opts`, but no longer needs the param id. */);
-
-    return (
-      <Table
-        scroll={{ y: 500 }}
-        components={VT}
-        columns={/*your columns*/}
-        dataSource={/*your data*/}
-      />
-    );
-  }
-
-  ```
-
+  - [Drag soring](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/Drag%20soring.jsx)
 
 ## License
 
