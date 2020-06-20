@@ -1,3 +1,11 @@
+## 1.0.0(zh)
+  1. 改进的虚拟化算法并全面支持antd4.
+
+
+## 1.0.0(en)
+  1. the improved virtualization algorithm, and full supports antd4.
+
+
 ## 0.7.8(zh)
   1. fix: 删除被标记为`deprecated`的接口和参数。
       + 接口：`getVTComponents`
