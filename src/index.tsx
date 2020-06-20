@@ -38,9 +38,8 @@ export function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  * // ... your code
  * 
  * 
- * // `set_components` is the same as the setComponents, excepet for the param id.
- * // `vt_scroll` is the same as the VTScroll, excepet for the param id.
- * const [ vt, set_components, vt_scroll ] = useVT();
+ * // `set_components` is the same as the setComponents
+ * const [ vt, set_components ] = useVT(() => ({ scroll: { y: 600 } }));
  * 
  * 
  * return (
