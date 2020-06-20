@@ -251,7 +251,7 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
   const {
     row_height,
     row_count,
-    possible_hight_per_tr,
+    possible_hight_per_tr: default_h,
     overscanRowCount,
   } = ctx;
   let overscan = overscanRowCount;
@@ -274,23 +274,23 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
   }
 
   console.assert(ctx._y >= 0);
-  // to calc `accumulate_top` with `row_height` and `overscan`.
-  let accumulate_top = 0, i = 0;
-  for (; i < row_count && accumulate_top <= top; ++i) {
-    accumulate_top += row_height[i];
+  // to calc `_top` with `row_height` and `overscan`.
+  let _top = 0, i = 0;
+  for (; i < row_count && _top <= top; ++i) {
+    _top += row_height[i] || default_h;
   }
   while (i > 0 && overscan--) {
-    accumulate_top -= row_height[--i];
+    _top -= row_height[--i];
   }
   // the height to render.
   let torender_h = 0, j = i;
   for (; j < row_count && torender_h < ctx._y; ++j) {
-    torender_h += (row_height[i] === void 0) ? possible_hight_per_tr : row_height[j];
+    torender_h += row_height[j] || default_h;
   }
   j += overscanRowCount * 2;
   if (j > row_count) j = row_count;
   // returns [head, tail, top].
-  return [0 | i, 0 | j, 0 | accumulate_top];
+  return [0 | i, 0 | j, 0 | _top];
 }
 
 
