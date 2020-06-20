@@ -18,7 +18,7 @@ const { useRef, useState, useCallback, useContext, useEffect, useMemo } = React;
 
 export
 interface vt_opts<RecordType> {
-  readonly id: number;
+  readonly id?: number;
   /**
    * @default 5
    */
@@ -44,16 +44,12 @@ interface vt_opts<RecordType> {
 }
 
 /**
- * `INIT` -> `LOADED` -> `RUNNING` -> `SUSPENDED`
- * `SUSPENDED` -> `WAITING` -> `RUNNING`
+ * `INIT` -> `LOADED` -> `RUNNING`
  */
 enum e_VT_STATE {
   INIT       = 1,
   LOADED     = 2,
   RUNNING    = 4,
-  SUSPENDED  = 8,
-  WAITING    = 16,
-  PROTECTION = 128,
 }
 
 
@@ -185,10 +181,7 @@ function log_debug(ctx: VT_CONTEXT, msg: string): void {
 const SCROLLEVT_NULL       = (0<<0);
 const SCROLLEVT_INIT       = (1<<0);
 const SCROLLEVT_RECOMPUTE  = (1<<1);
-const SCROLLEVT_RESTORETO  = (1<<2);
 const SCROLLEVT_NATIVE     = (1<<3);
-const SCROLLEVT_BARRIER    = (1<<4); // It only for `SCROLLEVT_RECOMPUTE`.
-// const SCROLLEVT_MASK       = SCROLLEVT_BARRIER | SCROLLEVT_RECOMPUTE;
 
 type SimEvent = {
   target: { scrollTop: number; scrollLeft: number };
@@ -228,20 +221,6 @@ const RowImpl = React.forwardRef<any>(function RowImpl(props, ref) {
 });
 
 
-
-function get_data(children: any[]): any[] {
-  return children.find((child) => child && child.props.data).props.data;
-}
-
-
-/**
- * define CONSTANTs.
- */
-// const MIN_FRAME = 16;
-
-/**
- * the following functions bind the `ctx`.
- */
 /**
  * O(n)
  * returns offset: [head, tail, top] 
@@ -321,30 +300,6 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
   ele.scrollLeft = left;
 }
 
-
-function apply_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
-  console.assert(h !== void 0, `failed to apply height at index ${idx}!`);
-  const _h = h - ctx.row_height[idx];
-  ctx.row_height[idx] += _h;
-  ctx.computed_h += _h;
-  if (ctx.debug) console.info("apply", identity, idx, _h);
-}
-
-
-function add_h(ctx: VT_CONTEXT, idx: number, h: number, identity: "dom" | "shadow"): void {
-  console.assert(h !== void 0, `failed to add the height at index ${idx}!`);
-  ctx.row_height[idx] = h;
-  ctx.computed_h += h; // just do add up.
-  if (ctx.debug) console.info("add", identity, idx, h);
-}
-
-
-function free_h(ctx: VT_CONTEXT, idx: number, identity: "dom" | "shadow"): void {
-  console.assert(ctx.row_height[idx] !== void 0, `failed to free this tr[${idx}].`);
-  ctx.computed_h -= ctx.row_height[idx];
-  if (ctx.debug) console.info("free", identity, idx, ctx.row_height[idx]);
-  if (identity === "dom") ctx.row_height[idx] = 0;
-}
 
 
 function _repainting(ctx: VT_CONTEXT, ms: number): number {
@@ -504,8 +459,6 @@ function VTable<T>(props: VTableProps<T>) {
       case SCROLLEVT_INIT:
         log_debug(ctx, "SCROLLEVT_INIT");
 
-        console.assert(scrollTop === 0 && scrollLeft === 0);
-        
         _set_offset(ctx, top, head, tail);
         setScroll({
           top: scrollTop,
@@ -534,22 +487,6 @@ function VTable<T>(props: VTableProps<T>) {
           end: false,
         });
         break;
-
-
-      // case SCROLLEVT_RESTORETO:
-      //   log_debug(ctx, "SCROLLEVT_RESTORETO");
-
-      //   _RC_rerender(ctx, top, head, tail, () => {
-      //     // to force update style assign `WH` to 0.
-      //     ctx.WH = 0;
-      //     update_wrap_style(ctx, ctx.computed_h);
-
-      //     scroll_to(ctx, scrollTop, scrollLeft);
-      //     HND_RAF.current = 0;
-  
-      //     if (event_queue.length) scroll_hook(null); // consume the next.
-      //   });
-      //   break;
 
 
       case SCROLLEVT_NATIVE:
@@ -618,17 +555,6 @@ function VTable<T>(props: VTableProps<T>) {
         });
         break;
 
-      case e_VT_STATE.WAITING:
-        // Do you get the previous data back?
-        if (get_data(props.children).length) {
-          // Y, `WAITING` -> `RUNNING`.
-          ctx.vt_state = e_VT_STATE.RUNNING;
-        } else {
-          // N, keep `WAITING` then just return.
-          return;
-        }
-        break;
-
       case e_VT_STATE.RUNNING:
         if (ctx.re_computed !== 0) { // rerender
           ctx.re_computed = 0;
@@ -638,19 +564,6 @@ function VTable<T>(props: VTableProps<T>) {
           });
         }
         break;
-
-      case e_VT_STATE.SUSPENDED: {
-        const len = ctx.row_count;
-        if (len > 0) {
-          // just only switch to `RUNNING`. 
-          ctx.vt_state = e_VT_STATE.RUNNING;
-        } else {
-          /* `SUSPENDED` -> `WAITING` */
-          ctx.vt_state = e_VT_STATE.WAITING;
-        }
-        break;
-      }
-
     }
   });
 
@@ -707,12 +620,6 @@ function VWrapper<T>(props: VWrapperProps<T>) {
   let trs: any[];
 
   switch (ctx.vt_state) {
-    // waitting for loading data as soon, just returns this as following.
-    case e_VT_STATE.WAITING:
-    case e_VT_STATE.SUSPENDED:
-      trs = children.slice(head, tail);
-      break;
-
     case e_VT_STATE.INIT:
       if (len >= 0) {
         console.assert(head === 0);
