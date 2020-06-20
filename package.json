@@ -1,7 +1,7 @@
 {
-  "name": "virtualizedtableforantd",
-  "version": "0.7.8",
-  "description": "The virtualized table component for ant design, using typescript.",
+  "name": "virtualizedtableforantd4",
+  "version": "1.0.0",
+  "description": "The virtualized table component for ant design4, using typescript.",
   "keywords": [
     "antd",
     "virtualized table",
@@ -26,6 +26,7 @@
     "clean": "rimraf lib es",
     "compile": "father build",
     "lint": "eslint src/ --ext .ts,.tsx",
+    "lint-fix": "eslint src/ --ext .ts,.tsx --fix",
     "build": "npm run lint && npm run compile",
     "prepublishOnly": "npm run clean && npm run build"
   },
@@ -41,7 +42,7 @@
   "private": false,
   "license": "MIT",
   "devDependencies": {
-    "@types/react": "^16.0.0",
+    "@types/react": "^16.8.0",
     "@typescript-eslint/eslint-plugin": "^2.10.0",
     "@typescript-eslint/parser": "^2.10.0",
     "cross-env": "^6.0.3",
@@ -53,7 +54,7 @@
   },
   "dependencies": {
     "antd": "^4.0.0",
-    "react": "^16.0.0",
-    "react-dom": "^16.0.0"
+    "react": "^16.8.0",
+    "react-dom": "^16.8.0"
   }
 }
