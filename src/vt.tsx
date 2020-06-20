@@ -702,9 +702,11 @@ function VTRow<T>(props: VRowProps<T>) {
 
   const children = props.children;
 
+  const Row = (ctx.components.body as body_t).row;
+
   if (!Array.isArray(children)) {
     // reference https://github.com/react-component/table/blob/master/src/Body/ExpandedRow.tsx#L55
-    return children;
+    return <Row {...rest}>{children}</Row>;
   }
 
   const index: number = children[0].props.index;
@@ -746,7 +748,6 @@ function VTRow<T>(props: VRowProps<T>) {
     repainting(ctx);
   });
 
-  const Row = (ctx.components.body as body_t).row;
   return <Row {...rest} ref={inst} />;
 }
 
