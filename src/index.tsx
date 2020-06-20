@@ -53,7 +53,7 @@ export function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  * );
  * }
  */
-function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>):
+function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>, deps?: React.DependencyList):
   [TableComponents<RecordType>,
   (components: TableComponents<RecordType>) => void,
   (param?: { top: number; left: number }) => {
@@ -61,11 +61,11 @@ function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>):
     left: number;
   }]
 {
-  const opts = useOnce(() => ({ id: +new Date(), ...fnOpts()}));
+  const opts = useMemo(() => (Object.assign({ id: +new Date() }, fnOpts())), deps);
   const ctx = init<RecordType>();
   const scroll = useOnce(() => (param?: { top: number; left: number }) => _vt_scroll(ctx, param));
   const set = useOnce(() => (components: TableComponents<RecordType>) => _set_components(ctx, components));
-  const vt = useOnce(() => vt_components(ctx, opts));
+  const vt = useMemo(() => vt_components(ctx, opts), [opts]);
 
   return [vt, set, scroll];
 }
