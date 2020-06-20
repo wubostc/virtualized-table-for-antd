@@ -721,14 +721,12 @@ function VWrapper<T>(props: VWrapperProps<T>) {
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
-        srs_expand(ctx, len, 0, 0);
       }
       break;
 
     case e_VT_STATE.RUNNING: {
-      let offset = 0;
       if (tail > len) {
-        offset = tail - len;
+        const offset = tail - len;
         tail -= offset;
         head -= offset;
         if (head < 0) head = 0;
@@ -746,31 +744,21 @@ function VWrapper<T>(props: VWrapperProps<T>) {
       len = ctx.row_count;
       const prev_len = ctx.prev_row_count;
 
-      /**
-       * start rendering phase.
-       * to render rows to filter.
-       */
-      if (len > prev_len) {
-        trs = [];
-        /* insert */
-        ctx._keys2insert = 0;
-        for (let i = head; i < tail; ++i) {
-          if (i >= ctx.row_height.length) {
-            ctx._keys2insert++;
-            // insert a row at index `i` with height `0`.
-            ctx.row_height.splice(i, 0, 0);
-          }
-          trs.push(children[i]);
-        }
-      } else {
-        trs = children.slice(head, tail);
-      }
-
+      /* shadow-rows rendering phase. */
       if (len < prev_len) {
         srs_shrink(ctx, len, prev_len);
       } else if (len > prev_len) {
-        srs_expand(ctx, len, prev_len, ctx.possible_hight_per_tr);
+        const rows = ctx.row_height;
+        if ((len - rows.length) > 0) {
+          srs_expand(ctx, len, rows.length, ctx.possible_hight_per_tr);
+        } else {
+          // calculate the total height quickly.
+          rows.fill(ctx.possible_hight_per_tr, prev_len, len);
+          ctx.computed_h += ctx.possible_hight_per_tr * (len - prev_len);
+        }
       }
+
+      trs = children.slice(head, tail);
 
       ctx.prev_row_count = ctx.row_count;
     }
@@ -824,10 +812,10 @@ function VTRow<T>(props: VRowProps<T>) {
       // apply_h(ctx, index, inst.current.offsetHeight, "dom");
       repainting(ctx);
     } else {
-      /* init context */
       console.assert(ctx.vt_state === e_VT_STATE.INIT);
       ctx.vt_state = e_VT_STATE.LOADED;
       ctx.possible_hight_per_tr = inst.current.offsetHeight;
+      srs_expand(ctx, ctx.row_count, 0, ctx.possible_hight_per_tr);
       // create a timeout task.
       _repainting(ctx, 16);
     }
