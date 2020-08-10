@@ -58,7 +58,7 @@
   ```typescript
   import React from 'react';
   import { Table } from 'antd';
-  import { VTComponents } from 'virtualedtableforantd4';
+  import { useVT } from 'virtualedtableforantd4';
 
   const [ vt, set_components ] = useVT(() => ({ scroll: { y: 600 } }), []);
 
