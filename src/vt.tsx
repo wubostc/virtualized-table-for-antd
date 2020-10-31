@@ -194,7 +194,7 @@ function _make_evt(ne: Event): SimEvent {
       scrollTop: target.scrollTop,
       scrollLeft: target.scrollLeft,
     },
-    end: target.scrollHeight - target.clientHeight === target.scrollTop,
+    end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
     flag: SCROLLEVT_NATIVE,
   };
 }
