@@ -3,7 +3,7 @@
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Table, Button, Input, Switch, Modal, Checkbox } from 'antd';
-import { useVT } from 'virtualizedtableforantd';
+import { useVT } from 'virtualizedtableforantd4';
 import { isNumber } from 'util';
 
 
@@ -179,11 +179,19 @@ export default function Table1() {
   const [overscanRowCount, setOverscanRowCount] = useState(5);
   const [destroy, setDestroy] = useState(false);
 
-  const [vt] = useVT<any>(() => Object.assign({
+  const [vt] = useVT(() => Object.assign({
     scroll: { y: height },
     debug: true,/* onScroll: ({ left, top }) => console.log(top, left) */
   },
-  overscanRowCount ? { overscanRowCount } : null));
+  {
+    onScroll: ({top, left, isEnd}) => {
+      console.log('isEnd', isEnd);
+      if (isEnd) {
+        window.alert('isEnd');
+      }
+    }
+  },
+  overscanRowCount ? { overscanRowCount } : null) as any, []);
 
   return (
     <>
