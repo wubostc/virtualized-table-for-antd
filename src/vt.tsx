@@ -11,13 +11,29 @@ The above copyright notice and this permission notice shall be included in all c
 
 
 import * as React from "react";
-import { TableComponents, CustomizeComponent } from "rc-table/es/interface";
-import { TableProps as RcTableProps } from 'rc-table/es/Table';
 
 const { useRef, useState, useCallback, useContext, useEffect, useMemo } = React;
 
+
+type CustomizeComponent = React.FC<any>;
+
 export
-interface vt_opts<RecordType> {
+interface TableComponents {
+  table?: CustomizeComponent;
+  header?: {
+      wrapper?: CustomizeComponent;
+      row?: CustomizeComponent;
+      cell?: CustomizeComponent;
+  };
+  body?: {
+      wrapper?: CustomizeComponent;
+      row?: CustomizeComponent;
+      cell?: CustomizeComponent;
+  };
+}
+
+export
+interface vt_opts {
   id?: number;
   /**
    * @default 5
@@ -27,7 +43,9 @@ interface vt_opts<RecordType> {
   /**
    * this only needs the scroll.y
    */
-  scroll: RcTableProps<RecordType>['scroll'];
+  scroll?: {
+    y: number;
+  };
 
   /**
    * wheel event(only works on native events).
@@ -53,22 +71,12 @@ enum e_VT_STATE {
 }
 
 
-type body_t = {
-  wrapper?: CustomizeComponent;
-  row?: CustomizeComponent;
-  cell?: CustomizeComponent;
-}
-
-interface RecordType extends Object {
-  [x: string]: any;
-}
-
-interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
+interface VT_CONTEXT extends vt_opts {
   _y: number; // will use the Table.scroll.y.
   _raw_y: number | string; // this is the same as the `Table.scroll.y`.
 
-  _vtcomponents: TableComponents<RecordType>; // virtual layer.
-  components: TableComponents<RecordType>;    // implementation layer.
+  _vtcomponents: TableComponents; // virtual layer.
+  components: TableComponents;    // implementation layer.
   computed_h: number;
   vt_state: e_VT_STATE;
   possible_hight_per_tr: number;
@@ -109,7 +117,7 @@ interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
 }
 
 
-function default_context<T>(): VT_CONTEXT<T> {
+function default_context(): VT_CONTEXT {
   return {
     vt_state: e_VT_STATE.INIT,
     possible_hight_per_tr: -1,
@@ -122,13 +130,13 @@ function default_context<T>(): VT_CONTEXT<T> {
     _offset_head: 0 | 0,
     _offset_tail: 0 | 1,
     WH: 0,                 // the wrapper's height
-  } as VT_CONTEXT<T>;
+  } as VT_CONTEXT;
 }
 
 
 
 /* overload __DIAGNOSIS__. */
-function helper_diagnosis<T>(ctx: VT_CONTEXT<T>): void {
+function helper_diagnosis(ctx: VT_CONTEXT): void {
   if (ctx.hasOwnProperty("CLICK~__DIAGNOSIS__")) return;
   Object.defineProperty(ctx, "CLICK~__DIAGNOSIS__", {
     get() {
@@ -342,14 +350,14 @@ function set_tr_cnt(ctx: VT_CONTEXT, n: number): void {
 }
 
 
-interface VTableProps<T> extends React.FC {
+interface VTableProps extends React.FC {
   style: React.CSSProperties;
-  context: React.Context<VT_CONTEXT<T>>;
+  context: React.Context<VT_CONTEXT>;
   [prop: string]: any;
 }
 
 
-function VTable<T>(props: VTableProps<T>) {
+function VTable(props: VTableProps) {
   const { style, context, ...rest } = props;
 
   /*********** DOM ************/
@@ -358,12 +366,12 @@ function VTable<T>(props: VTableProps<T>) {
   /*********** context ************/
   const ctx = useContext(context);
   useMemo(() => {
-    Object.assign(ctx, default_context<T>());
+    Object.assign(ctx, default_context());
     if (ctx.wrap_inst && ctx.wrap_inst.current) {
       ctx.wrap_inst.current.parentElement.onscroll = null;
     }
     ctx.wrap_inst = wrap_inst;
-    helper_diagnosis<T>(ctx);
+    helper_diagnosis(ctx);
   }, []);
 
 
@@ -583,16 +591,16 @@ function VTable<T>(props: VTableProps<T>) {
 }
 
 
-interface VWrapperProps<T> extends React.FC {
+interface VWrapperProps extends React.FC {
   style: React.CSSProperties;
-  ctx: VT_CONTEXT<T>;
+  ctx: VT_CONTEXT;
   [prop: string]: any;
 }
 
-function VWrapper<T>(props: VWrapperProps<T>) {
+function VWrapper(props: VWrapperProps) {
   const { children: [measureRow, rows], ctx, ...restProps } = props;
 
-  const Wrapper = (ctx.components.body as body_t).wrapper;
+  const Wrapper = ctx.components.body.wrapper;
 
   if (!Array.isArray(rows)) {
     // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L66
@@ -676,14 +684,14 @@ function VWrapper<T>(props: VWrapperProps<T>) {
   );
 }
 
-interface VRowProps<T> extends React.FC {
+interface VRowProps extends React.FC {
   style: React.CSSProperties;
-  context: VT_CONTEXT<T>;
+  context: VT_CONTEXT;
   [prop: string]: any;
 }
 
 
-function VTRow<T>(props: VRowProps<T>) {
+function VTRow(props: VRowProps) {
 
   const inst = React.createRef<HTMLTableRowElement>();
 
@@ -693,7 +701,7 @@ function VTRow<T>(props: VRowProps<T>) {
 
   const children = props.children;
 
-  const Row = (ctx.components.body as body_t).row;
+  const Row = ctx.components.body.row;
 
   if (!Array.isArray(children)) {
     // reference https://github.com/react-component/table/blob/master/src/Body/ExpandedRow.tsx#L55
@@ -740,11 +748,11 @@ function VTRow<T>(props: VRowProps<T>) {
 
 
 export
-function _set_components<T>(ctx: VT_CONTEXT<T>, components: TableComponents<T>): void {
+function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
   const { table, body, header } = components;
   ctx.components.body = { ...ctx.components.body, ...body };
-  if (body && (body as body_t).cell) {
-    (ctx._vtcomponents.body as body_t).cell = (body as body_t).cell;
+  if (body && body.cell) {
+    ctx._vtcomponents.body.cell = body.cell;
   } 
   if (header) {
     ctx.components.header = header;
@@ -756,13 +764,13 @@ function _set_components<T>(ctx: VT_CONTEXT<T>, components: TableComponents<T>):
 }
 
 export
-function init<T>(): VT_CONTEXT<T> {
+function init(): VT_CONTEXT {
 
-  const ctx = useRef(React.createContext<VT_CONTEXT<T>>({ } as VT_CONTEXT)).current;
+  const ctx = useRef(React.createContext<VT_CONTEXT>({ } as VT_CONTEXT)).current;
   const ctx_value = useContext(ctx);
 
   const VTableC = useCallback((props: any) => {
-    return <VTable<T> {...props} context={ctx} />;
+    return <VTable {...props} context={ctx} />;
   }, []);
 
   const VWrapperC = useCallback((props: any) => {
@@ -770,7 +778,7 @@ function init<T>(): VT_CONTEXT<T> {
       <ctx.Consumer>
         {(/* value */) => {
           return (
-            <VWrapper<T> {...props} ctx={ctx_value}/>
+            <VWrapper {...props} ctx={ctx_value}/>
           );
         }}
       </ctx.Consumer>
@@ -778,7 +786,7 @@ function init<T>(): VT_CONTEXT<T> {
   }, []);
 
   const VRowC = useCallback((props: any) => {
-    return <VTRow<T> {...props} context={ctx_value} />;
+    return <VTRow {...props} context={ctx_value} />;
   }, []);
 
   useMemo(() => {
@@ -809,7 +817,7 @@ function init<T>(): VT_CONTEXT<T> {
 
 
 export
-function vt_components<T>(ctx: VT_CONTEXT<T>, vt_opts: vt_opts<T>): TableComponents<T> {
+function vt_components(ctx: VT_CONTEXT, vt_opts: vt_opts): TableComponents {
   Object.assign(
     ctx,
     {
