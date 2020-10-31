@@ -10,9 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import * as React from "react";
-
-const { useRef, useState, useCallback, useContext, useEffect, useMemo } = React;
+import React, { useRef, useState, useCallback, useContext, useEffect, useMemo } from "react";
 
 
 type CustomizeComponent = React.FC<any>;
