@@ -10,7 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import React, { useRef, useState, useCallback, useContext, useEffect, useMemo } from "react";
+import React, { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from "react";
 
 
 type CustomizeComponent = React.FC<any>;
@@ -57,6 +57,12 @@ interface vt_opts {
    * @default false
    */
   debug?: boolean;
+
+
+  // pass -1 means scroll to the bottom of the table
+  ref: React.MutableRefObject<{
+    scrollTo: (y: number) => void;
+  }>
 }
 
 /**
@@ -179,6 +185,7 @@ const SCROLLEVT_NULL       = (0<<0);
 const SCROLLEVT_INIT       = (1<<0);
 const SCROLLEVT_RECOMPUTE  = (1<<1);
 const SCROLLEVT_NATIVE     = (1<<3);
+const SCROLLEVT_BY_HOOK    = (1<<7);
 
 type SimEvent = {
   target: { scrollTop: number; scrollLeft: number };
@@ -251,15 +258,27 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
 
   console.assert(ctx._y >= 0);
   // to calc `_top` with `row_height` and `overscan`.
-  let _top = 0, i = 0;
+  let _top = 0, i = 0, j = 0;
+  // the height to render.
+  let torender_h = 0
+
+  // scroll to the bottom of the table.
+  if (top === -1 && row_count > 0) {
+    i = row_count;
+    while (i > 0 && torender_h < ctx._y) {
+      torender_h += row_height[--i];
+    }
+
+    return [0 | i, 0 | row_count, 0 | ctx.WH - torender_h];
+  }
+
   for (; i < row_count && _top <= top; ++i) {
     _top += row_height[i] || default_h;
   }
   while (i > 0 && overscan--) {
     _top -= row_height[--i];
   }
-  // the height to render.
-  let torender_h = 0, j = i;
+  j = i;
   for (; j < row_count && torender_h < ctx._y; ++j) {
     torender_h += row_height[j] || default_h;
   }
@@ -355,7 +374,7 @@ interface VTableProps extends React.FC {
 }
 
 
-function VTable(props: VTableProps) {
+function VTable(props: VTableProps, ref: React.Ref<any>) {
   const { style, context, ...rest } = props;
 
   /*********** DOM ************/
@@ -397,6 +416,9 @@ function VTable(props: VTableProps) {
     if (e) {
       if (e.flag) {
         event_queue.push(e);
+
+        if (e.flag & SCROLLEVT_BY_HOOK)
+          return RAF_update_self(0);
       } else {
         nevent_queue.push(e);
       }
@@ -428,19 +450,19 @@ function VTable(props: VTableProps) {
       return;
     }
 
-    const scrollTop = e.target.scrollTop;
-    const scrollLeft = e.target.scrollLeft;
+    let etop = e.target.scrollTop;
+    let eleft = e.target.scrollLeft;
     const flag = e.flag;
 
     if (ctx.debug) {
-      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, scrollTop, scrollLeft);
+      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, etop, eleft);
     }
 
 
     // checks every tr's height, which will take some time...
     const offset = scroll_with_offset(
                      ctx,
-                     scrollTop,
+                     etop,
                      ctx.scroll.y);
 
     const head = offset[0];
@@ -451,20 +473,23 @@ function VTable(props: VTableProps) {
     const prev_tail = ctx._offset_tail;
     const prev_top = ctx._offset_top;
 
+    let end: boolean;
 
     switch (flag) {
       case SCROLLEVT_INIT:
         log_debug(ctx, "SCROLLEVT_INIT");
-
-        _set_offset(ctx, top, head, tail);
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_INIT,
-          end: false,
-        });
+        end = false;
         break;
 
+      case SCROLLEVT_BY_HOOK:
+        log_debug(ctx, "SCROLLEVT_BY_HOOK");
+        if (etop === -1) {
+          etop = top;
+          end = true;
+        } else {
+          end = false;
+        }
+        break;
 
       case SCROLLEVT_RECOMPUTE:
         log_debug(ctx, "SCROLLEVT_RECOMPUTE");
@@ -476,13 +501,7 @@ function VTable(props: VTableProps) {
           return;
         }
 
-        _set_offset(ctx, top, head, tail);
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_RECOMPUTE,
-          end: false,
-        });
+        end = false;
         break;
 
 
@@ -492,8 +511,8 @@ function VTable(props: VTableProps) {
         HND_RAF.current = 0;
         if (ctx.onScroll) {
           ctx.onScroll({
-            top: scrollTop,
-            left: scrollLeft,
+            top: etop,
+            left: eleft,
             isEnd: e.end,
           });
         }
@@ -502,16 +521,30 @@ function VTable(props: VTableProps) {
           return;
         }
 
-        _set_offset(ctx, top, head, tail);
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_NATIVE,
-          end: e.end,
-        });
+        end = e.end;
         break;
     }
 
+    _set_offset(ctx, top, head, tail);
+    setScroll({
+      top: etop,
+      left: eleft,
+      flag,
+      end,
+    });
+  }, []);
+
+
+  // expose to parent components.
+  useImperativeHandle(ref, () => {
+    return {
+      scrollTo: (y: number) => {
+        scroll_hook({
+          target: { scrollTop: y, scrollLeft: -1 },
+          flag: SCROLLEVT_BY_HOOK,
+        });
+      },
+    }
   }, []);
 
 
@@ -523,14 +556,16 @@ function VTable(props: VTableProps) {
   // update DOM style.
   useEffect(() => {
     switch (scroll.flag) {
+      case SCROLLEVT_BY_HOOK:
+        ctx.wrap_inst.current.parentElement.onscroll = null;
+        scroll_to(ctx, scroll.top, scroll.left);
+        break;
       case SCROLLEVT_INIT:
       case SCROLLEVT_RECOMPUTE:
+        ctx.wrap_inst.current.parentElement.onscroll = scroll_hook;
         scroll_to(ctx, scroll.top, scroll.left);
         HND_RAF.current = 0;
         if (event_queue.length) scroll_hook(null); // consume the next.
-        break;
-
-      default:
         break;
     }
   }, [scroll]);
@@ -762,38 +797,42 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
 }
 
 export
-function init(): VT_CONTEXT {
-
+function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
   const ctx = useRef(React.createContext<VT_CONTEXT>({ } as VT_CONTEXT)).current;
   const ctx_value = useContext(ctx);
-
-  const VTableC = useCallback((props: any) => {
-    return <VTable {...props} context={ctx} />;
-  }, []);
-
-  const VWrapperC = useCallback((props: any) => {
-    return (
-      <ctx.Consumer>
-        {(/* value */) => {
-          return (
-            <VWrapper {...props} ctx={ctx_value}/>
-          );
-        }}
-      </ctx.Consumer>
-    );
-  }, []);
-
-  const VRowC = useCallback((props: any) => {
-    return <VTRow {...props} context={ctx_value} />;
-  }, []);
+  const default_ref: vt_opts['ref'] = useRef();
+  useMemo(() => {
+    return Object.assign(
+      ctx_value,
+      {
+        id: +new Date(),
+        initTop: 0,
+        overscanRowCount: 5,
+        debug: false,
+        ref: default_ref,
+      },
+      fnOpts());
+    }, deps);
 
   useMemo(() => {
+    const VTable2 = React.forwardRef(VTable);
+
     // set the virtual layer.
     ctx_value._vtcomponents = {
-      table: VTableC,
+      table: (props) => <VTable2 {...props} context={ctx} ref={ctx_value.ref} />,
       body: {
-        wrapper: VWrapperC,
-        row: VRowC,
+        wrapper: (props: any) => {
+          return (
+            <ctx.Consumer>
+              {(/* value */) => {
+                return (
+                  <VWrapper {...props} ctx={ctx_value}/>
+                );
+              }}
+            </ctx.Consumer>
+          )
+        },
+        row: (props) => <VTRow {...props} context={ctx_value} />,
       }
     };
     // set the default implementation layer.
@@ -810,25 +849,5 @@ function init(): VT_CONTEXT {
   }, []);
 
   return ctx_value;
-}
-
-
-
-export
-function vt_components(ctx: VT_CONTEXT, vt_opts: vt_opts): TableComponents {
-  Object.assign(
-    ctx,
-    {
-      initTop: 0,
-      overscanRowCount: 5,
-      debug: false,
-    } as VT_CONTEXT,
-    vt_opts);
-
-  if (vt_opts.debug) {
-    console.debug(`[${vt_opts.id}] calling VTComponents with`, vt_opts);
-  }
-
-  return ctx._vtcomponents;
 }
 
