@@ -1,4 +1,4 @@
-# The virtualized table component for AntD4，fast and restorable.
+# The virtualized table component for AntD4，fast, restorable and smallest size for gzip!
 
 
 ![npm](https://img.shields.io/npm/v/virtualizedtableforantd4)
@@ -16,30 +16,38 @@
 
 + the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
   ```typescript
-  export interface vt_opts<RecordType> {
-      id?: number;
-      /**
-      * @default 5
-      */
-      overscanRowCount?: number;
-      /**
-      * this only needs the scroll.y
-      */
-      scroll: RcTableProps<RecordType>['scroll'];
-      /**
-      * wheel event(only works on native events).
-      * 滚轮事件（只对原生事件有效）。
-      */
-      onScroll?: ({ left, top, isEnd, }: {
-          top: number;
-          left: number;
-          isEnd: boolean;
-      }) => void;
-      initTop?: number;
-      /**
-      * @default false
-      */
-      debug?: boolean;
+  interface vt_opts {
+    id?: number;
+    /**
+     * @default 5
+     */
+    overscanRowCount?: number;
+
+    /**
+     * this only needs the scroll.y
+     */
+    scroll?: {
+      y: number;
+    };
+
+    /**
+     * wheel event(only works on native events).
+     */
+    onScroll?: ({ left, top, isEnd, }:
+      { top: number; left: number; isEnd: boolean }) => void;
+
+    initTop?: number;
+
+    /**
+     * @default false
+     */
+    debug?: boolean;
+
+
+    // pass -1 means scroll to the bottom of the table
+    ref?: React.MutableRefObject<{
+      scrollTo: (y: number) => void;
+    }>
   }
   ```
 
@@ -69,6 +77,9 @@
     dataSource={/*your data*/}
   />
   ```
+
++ Scroll to
+  - [scroll-to](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/scroll-to.tsx)
 
 
 + Restoring last state
