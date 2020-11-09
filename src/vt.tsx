@@ -511,12 +511,13 @@ function VTable(props: VTableProps, ref: React.Ref<any>) {
 
       case SCROLLEVT_BY_HOOK:
         log_debug(ctx, "SCROLLEVT_BY_HOOK");
-        if (ctx.final_top === -1) etop = top;
 
         if (head === prev_head && tail === prev_tail && top === prev_top) {
           ctx.f_final_top = TOP_DONE;
+          if (ctx.final_top === -1) etop = ctx.computed_h - ctx._y;
           end = true;
         } else {
+          if (ctx.final_top === -1) etop = top;
           end = false;
         }
 
