@@ -1,3 +1,9 @@
+## 1.1.0(zh)
+  1. feat: scrollTo方法，支持指定位置滚动(#75).
+  2. fix: 支持React17(#77).
+  3. fix: 修复onScroll参数在高DPI下isEnd无法为true的问题(#74).
+
+
 ## 1.0.0(zh)
   1. 改进的虚拟化算法并全面支持antd4.
 
