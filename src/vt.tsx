@@ -78,7 +78,7 @@ interface vt_opts {
 
 
   // pass -1 means scroll to the bottom of the table
-  ref: React.MutableRefObject<{
+  ref?: React.MutableRefObject<{
     scrollTo: (y: number) => void;
   }>
 }
