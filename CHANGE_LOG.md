@@ -1,3 +1,9 @@
+## 1.1.1(zh)
+  1. fix: 空数据的渲染问题.
+## 1.1.1(en)
+  1. fix: rendering of empty data.
+
+
 ## 1.1.0(zh)
   1. feat: scrollTo方法，支持指定位置滚动(#75).
   2. fix: 支持React17(#77).
