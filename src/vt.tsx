@@ -80,7 +80,7 @@ interface vt_opts {
   // pass -1 means scroll to the bottom of the table
   ref?: React.MutableRefObject<{
     scrollTo: (y: number) => void;
-  }>
+  }>;
 }
 
 /**
@@ -337,8 +337,10 @@ function set_scroll(ctx: VT_CONTEXT,
 function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
   if (ctx.WH === h) return;
   ctx.WH = h;
-  ctx.wrap_inst.current.style.height = `${h}px`;
-  ctx.wrap_inst.current.style.maxHeight = `${h}px`;
+  const s = ctx.wrap_inst.current.style;
+  s.height = h ?
+    (s.maxHeight = h + 'px', s.maxHeight) :
+    (s.maxHeight = 'unset', s.maxHeight);
 }
 
 
@@ -386,6 +388,10 @@ function srs_expand(ctx: VT_CONTEXT, len: number, prev_len: number, fill_value: 
 
 
 function srs_shrink(ctx: VT_CONTEXT, len: number, prev_len: number): void {
+  if (len === 0) {
+    ctx.computed_h = 0;
+    return;
+  }
   const rows = ctx.row_height;
   let h2shrink = 0;
   for (let i = len; i < prev_len; ++i) {
@@ -665,28 +671,18 @@ function VWrapper(props: VWrapperProps) {
 
   const Wrapper = ctx.components.body.wrapper;
 
-  if (!Array.isArray(rows)) {
-    // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L66
-    // emptyNode if these rows are not array.
-    return (
-      <Wrapper {...restProps}>
-        {measureRow}
-        {rows}
-      </Wrapper>
-    );
-  }
+  // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L6
+  let len = Array.isArray(rows) ? rows.length : 0;
 
   let { _offset_head: head, _offset_tail: tail } = ctx;
-  const children = rows;
-  let len = children.length;
-  let trs: any[];
+  let trs: any;
 
   switch (ctx.vt_state) {
     case e_VT_STATE.INIT:
       if (len >= 0) {
         console.assert(head === 0);
         console.assert(tail === 1);
-        trs = children.slice(head, tail);
+        trs = rows.slice(head, tail);
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
@@ -717,17 +713,17 @@ function VWrapper(props: VWrapperProps) {
       if (len < prev_len) {
         srs_shrink(ctx, len, prev_len);
       } else if (len > prev_len) {
-        const rows = ctx.row_height;
-        if ((len - rows.length) > 0) {
-          srs_expand(ctx, len, rows.length, ctx.possible_hight_per_tr);
+        const row_h = ctx.row_height;
+        if ((len - row_h.length) > 0) {
+          srs_expand(ctx, len, row_h.length, ctx.possible_hight_per_tr);
         } else {
           // calculate the total height quickly.
-          rows.fill(ctx.possible_hight_per_tr, prev_len, len);
+          row_h.fill(ctx.possible_hight_per_tr, prev_len, len);
           ctx.computed_h += ctx.possible_hight_per_tr * (len - prev_len);
         }
       }
 
-      trs = children.slice(head, tail);
+      trs = len ? rows.slice(head, tail) : rows;
 
       ctx.prev_row_count = ctx.row_count;
     }
