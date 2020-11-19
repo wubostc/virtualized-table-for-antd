@@ -1,3 +1,9 @@
+## 1.1.2(zh)
+  1. fix: 初始化时空数据的崩溃问题(#84).
+## 1.1.2(en)
+  1. fix: crashing problem by the empty data, it happened when the VT was initialized(#84).
+
+
 ## 1.1.1(zh)
   1. fix: 空数据的渲染问题.
 ## 1.1.1(en)
