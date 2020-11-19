@@ -682,7 +682,7 @@ function VWrapper(props: VWrapperProps) {
       if (len >= 0) {
         console.assert(head === 0);
         console.assert(tail === 1);
-        trs = rows.slice(head, tail);
+        trs = Array.isArray(rows) ? rows.slice(head, tail) : rows;
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
