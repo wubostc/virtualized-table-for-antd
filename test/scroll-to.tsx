@@ -25,11 +25,12 @@ for (let i = 0; i < 1000; i++) {
 
 const TableScrollTo: FC = () => {
   const [top, setTop] = useState(-1);
-  const ref = useRef();
+  const [idx, setIdx] = useState(0);
+  // const ref = useRef();
 
-  const [VT] = useVT(() => {
+  const [VT, _, ref/* new */] = useVT(() => {
     return {
-      ref: ref,
+      // ref: ref, // deprecated
       initTop: 1000,
       debug: true,
       scroll: {
@@ -41,7 +42,9 @@ const TableScrollTo: FC = () => {
   
   return (
     <>
+      scrollTo: 
       <Input
+        width={100}
         onChange={e => {
           const top = (+e.target.value);
           setTop(Number.isNaN(top) ? 0 : top);
@@ -49,11 +52,31 @@ const TableScrollTo: FC = () => {
       />
       <Button
         onClick={() => {
+          // ref.current.scrollTo(top) // deprecated
           ref.current.scrollTo(top)
         }}
       >
         {`jump to ${top === -1 ? 'the bottom of the table' : `top: ${top}`}`}
       </Button>
+
+      <br />
+      scrollToIdx:
+      <Input
+        width={100}
+
+        onChange={e => {
+          const idx = (+e.target.value);
+          setIdx(Number.isNaN(idx) ? 0 : idx);
+        }}
+      />
+      <Button
+        onClick={() => {
+          ref.current.scrollToIdx(idx)
+        }}
+      >
+        {`jump to the idx of the rows: ${idx}`}
+      </Button>
+
       <Table
         columns={[{
           title: 'index',

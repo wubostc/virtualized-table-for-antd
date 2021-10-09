@@ -55,13 +55,14 @@ function useVT(fnOpts: () => vt_opts, deps: React.DependencyList = []):
   [
     TableComponents,
     (components: TableComponents) => void,
+    vt_opts['ref']
   ]
 {
   const ctx = init(fnOpts, deps);
   const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components));
 
 
-  return [ctx._vtcomponents, set];
+  return [ctx._vtcomponents, set, ctx.ref];
 }
 
 export { useVT };
