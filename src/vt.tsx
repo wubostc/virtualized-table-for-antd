@@ -80,6 +80,7 @@ interface vt_opts {
   // pass -1 means scroll to the bottom of the table
   ref?: React.MutableRefObject<{
     scrollTo: (y: number) => void;
+    scrollToIndex: (idx: number) => void;
   }>;
 }
 
@@ -259,7 +260,6 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
   const {
     row_height,
     row_count,
-    possible_hight_per_tr: default_h,
     overscanRowCount,
   } = ctx;
   let overscan = overscanRowCount;
@@ -297,15 +297,15 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
     return [0 | i, 0 | row_count, 0 | ctx.computed_h - torender_h];
   }
 
-  for (; i < row_count && _top <= top; ++i) {
-    _top += row_height[i] || default_h;
+  for (; i < row_count && _top < top; ++i) {
+    _top += row_height[i];
   }
   while (i > 0 && overscan--) {
     _top -= row_height[--i];
   }
   j = i;
   for (; j < row_count && torender_h < ctx._y; ++j) {
-    torender_h += row_height[j] || default_h;
+    torender_h += row_height[j];
   }
   j += overscanRowCount * 2;
   if (j > row_count) j = row_count;
@@ -416,12 +416,14 @@ interface VTableProps extends React.FC {
 }
 
 
-function VTable(props: VTableProps, ref: React.Ref<any>) {
+function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
   const { style, context, ...rest } = props;
 
 
   // force update this vt.
   const force = useState(0);
+
+  const ref_func = useRef<() => void>();
 
 
   /*********** DOM ************/
@@ -446,7 +448,7 @@ function VTable(props: VTableProps, ref: React.Ref<any>) {
   const HND_RAF = useRef(0); // handle of requestAnimationFrame
 
   /* eslint-disable prefer-const */
-  let RAF_update_self: (timestamp: number) => void;
+  let RAF_update_self: FrameRequestCallback;
 
   /*********** scroll hook ************/
   const scroll_hook = useCallback((e: SimEvent) => {
@@ -472,7 +474,7 @@ function VTable(props: VTableProps, ref: React.Ref<any>) {
   }, []);
 
   /* requestAnimationFrame callback */
-  RAF_update_self = useCallback((timestamp: number) => {
+  RAF_update_self = useCallback((_: number) => {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
 
     const evq  = event_queue;
@@ -572,16 +574,32 @@ function VTable(props: VTableProps, ref: React.Ref<any>) {
 
   // expose to the parent components you are using.
   useImperativeHandle(ref, () => {
+    // `y === -1` indicates you need to scroll to the bottom of the table.
+    const scrollTo = (y: number) => {
+      ctx.f_final_top = TOP_CONTINUE;
+      ctx.final_top = y;
+      scroll_hook({
+        target: { scrollTop: y, scrollLeft: -1 },
+        flag: SCROLLEVT_BY_HOOK,
+      });
+    }
     return {
-      // `y === -1` indicates you need to scroll to the bottom of the table.
-      scrollTo: (y: number) => {
-        ctx.f_final_top = TOP_CONTINUE;
-        ctx.final_top = y;
-        scroll_hook({
-          target: { scrollTop: y, scrollLeft: -1 },
-          flag: SCROLLEVT_BY_HOOK,
-        });
+      scrollTo: (y) => {
+        ref_func.current = () => scrollTo(y);
+        ref_func.current();
       },
+      scrollToIndex: (idx) => {
+        ref_func.current = () => {
+          if (idx > ctx.row_count - 1) idx = ctx.row_count - 1;
+          if (idx < 0) idx = 0;
+          let y = 0;
+          for (let i = 0; i < idx; ++i) {
+            y += ctx.row_height[i];
+          }
+          scrollTo(y);
+        }
+        ref_func.current();
+      }
     }
   }, []);
 
@@ -595,7 +613,11 @@ function VTable(props: VTableProps, ref: React.Ref<any>) {
   useEffect(() => {
     switch (ctx.evt) {
       case SCROLLEVT_BY_HOOK:
-        scroll_to(ctx, ctx.top, ctx.left);
+        if (ctx.f_final_top === TOP_CONTINUE) {
+          ref_func.current()
+        } else {
+          scroll_to(ctx, ctx.top, ctx.left);
+        }
         break;
       case SCROLLEVT_INIT:
       case SCROLLEVT_RECOMPUTE:
