@@ -1,3 +1,13 @@
+## 1.1.4(zh)
+  1. feat: `useVT` 返回 ref.
+  2. fix: 改进了 `scrollTo`，可以精确地滚动到指定位置.
+  3. feat: 新增 `scrollToIndex` 方法(#94)，[例子](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/scroll-to.tsx#L74)
+## 1.1.4(en)
+  1. feat: `useVT` can returns `ref` instead of the previous method.
+  2. fix: `scrollTo` has been improved, that can now scroll exactly to the specified position.
+  3. feat: added function `scrollToIndex`(#94), [refer](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/scroll-to.tsx#L74)
+
+
 ## 1.1.3(zh)
   1. fix: 删除多余的导出 useOnce.
   2. fix: 一个bug(#100).
