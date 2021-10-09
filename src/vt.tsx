@@ -390,6 +390,7 @@ function srs_expand(ctx: VT_CONTEXT, len: number, prev_len: number, fill_value: 
 function srs_shrink(ctx: VT_CONTEXT, len: number, prev_len: number): void {
   if (len === 0) {
     ctx.computed_h = 0;
+    ctx.row_height.length = 0;
     return;
   }
   const rows = ctx.row_height;
