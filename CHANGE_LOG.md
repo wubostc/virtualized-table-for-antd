@@ -1,3 +1,12 @@
+## 1.1.3(zh)
+  1. fix: 删除多余的导出 useOnce.
+  2. fix: 一个bug(#100).
+## 1.1.3(en)
+  1. fix: `useOnce` of the exports has been deleted.
+  2. fix: a bug(#100).
+
+
+
 ## 1.1.2(zh)
   1. fix: 初始化时空数据的崩溃问题(#84).
 ## 1.1.2(en)
