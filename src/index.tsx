@@ -24,7 +24,7 @@ const _node = 2;
 })();
 
 
-export function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
+function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
   const ref = useRef(null);
   return useMemo(() => factory(...args), [ref.current]);
 }
