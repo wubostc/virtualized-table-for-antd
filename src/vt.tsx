@@ -262,7 +262,6 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
     row_count,
     overscanRowCount,
   } = ctx;
-  let overscan = overscanRowCount;
 
   if (typeof scroll_y === "number") {
     ctx._raw_y = scroll_y as number;
@@ -300,14 +299,20 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
   for (; i < row_count && _top < top; ++i) {
     _top += row_height[i];
   }
-  while (i > 0 && overscan--) {
-    _top -= row_height[--i];
-  }
+
+  // start j from the visible area
   j = i;
   for (; j < row_count && torender_h < ctx._y; ++j) {
     torender_h += row_height[j];
   }
-  j += overscanRowCount * 2;
+
+  // keep offset row on top and bottom
+  let overscan = overscanRowCount;
+  while (i > 0 && overscan--) {
+    _top -= row_height[--i];
+  }
+  j += overscanRowCount;
+  
   if (j > row_count) j = row_count;
   // returns [head, tail, top].
   return [0 | i, 0 | j, 0 | _top];
@@ -811,7 +816,19 @@ function VTRow(props: VRowProps) {
 
 
   useEffect(() => {
-    const h = inst.current.offsetHeight;
+    const rowElm = inst.current;
+
+    // for nested(expanded) elements don't calculate height and add on cache as its already accommodated on parent row
+    if (!rowElm.matches(".ant-table-row-level-0")) return;
+
+    let h = rowElm.offsetHeight;
+    let sibling = rowElm.nextSibling as HTMLTableRowElement;
+    // include heights of all nested rows, in parent rows
+    while (sibling && !sibling.matches(".ant-table-row-level-0")) {
+      h += sibling.offsetHeight;
+      sibling = sibling.nextSibling as HTMLTableRowElement;
+    }
+    
     const curr_h = ctx.row_height[index];
     const last_h = ctx.row_height[last_index.current];
 
