@@ -576,6 +576,14 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
     force[1](++ctx.update_count);
   }, []);
 
+  useEffect(() => {
+    // on scroll size change rerender
+    scroll_hook({
+      target: { scrollTop: ctx.top, scrollLeft: ctx.left },
+      flag: SCROLLEVT_BY_HOOK,
+    });
+  }, [ctx.scroll.y])
+
 
   // expose to the parent components you are using.
   useImperativeHandle(ref, () => {
