@@ -662,8 +662,14 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
   const { width, ...rest_style } = style;
 
   const wrap_style = useMemo<React.CSSProperties>(
-    () => ({ width, position: "relative", transform: "matrix(1, 0, 0, 1, 0, 0)" }),
-    [width]);
+    () => ({
+      width,
+      minWidth: "100%",
+      position: "relative",
+      transform: "matrix(1, 0, 0, 1, 0, 0)",
+    }),
+    [width]
+  );
 
   const Table = ctx.components.table;
 
