@@ -817,7 +817,7 @@ function VTRow(props: VRowProps) {
 
 
   useEffect(() => {
-    const h = inst.current.offsetHeight;
+    const h = Math.ceil(inst.current.getBoundingClientRect().height); // change from fb9f71f
     const curr_h = ctx.row_height[index];
     const last_h = ctx.row_height[last_index.current];
 
