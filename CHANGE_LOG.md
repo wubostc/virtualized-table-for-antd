@@ -1,3 +1,15 @@
+## 1.1.5(zh)
+  1. 添加支持 `expandable`，(#106)
+     [例子](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/expandable.tsx).
+  2. 表样式增加 `minWidth: 100%`(#114).
+  3. 修复`useVT`的`scroll`类型问题(#116).
+## 1.1.5(en)
+  1. Added support for `expandable`,(#106)
+     [refer](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/expandable.tsx).
+  2. Added table style `minWidth: 100%`(#114).
+  3. Fixed the `scroll` type problem of `useVT`(#116).
+
+
 ## 1.1.4(zh)
   1. feat: `useVT` 返回 ref.
   2. fix: 改进了 `scrollTo`，可以精确地滚动到指定位置.
