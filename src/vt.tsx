@@ -307,7 +307,7 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
   }
 
   // keep offset row on top and bottom
-  let overscan = overscanRowCount;
+  let overscan = overscanRowCount < 0 ? 0 : overscanRowCount;
   while (i > 0 && overscan--) {
     _top -= row_height[--i];
   }
@@ -576,14 +576,6 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
     force[1](++ctx.update_count);
   }, []);
 
-  useEffect(() => {
-    // on scroll size change rerender
-    scroll_hook({
-      target: { scrollTop: ctx.top, scrollLeft: ctx.left },
-      flag: SCROLLEVT_BY_HOOK,
-    });
-  }, [ctx.scroll.y])
-
 
   // expose to the parent components you are using.
   useImperativeHandle(ref, () => {
@@ -805,11 +797,12 @@ function VTRow(props: VRowProps) {
   const Row = ctx.components.body.row;
 
   if (!Array.isArray(children)) {
-    // reference https://github.com/react-component/table/blob/master/src/Body/ExpandedRow.tsx#L55
+    // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L211
     return <Row {...rest}>{children}</Row>;
   }
 
   const index: number = children[0].props.index;
+  const prefixCls: string = children[0].props.prefixCls || "ant-table";
   const last_index = useRef<number>(children[0].props.index);
 
   useEffect(() => {
@@ -833,12 +826,13 @@ function VTRow(props: VRowProps) {
     const rowElm = inst.current;
 
     // for nested(expanded) elements don't calculate height and add on cache as its already accommodated on parent row
-    if (!rowElm.matches(".ant-table-row-level-0")) return;
+    // if (!rowElm.matches(".ant-table-row-level-0")) return;
 
     let h = rowElm.offsetHeight;
     let sibling = rowElm.nextSibling as HTMLTableRowElement;
+    // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L212
     // include heights of all nested rows, in parent rows
-    while (sibling && !sibling.matches(".ant-table-row-level-0")) {
+    while (sibling && !sibling.matches(`.${prefixCls}-row-level-0`)) {
       h += sibling.offsetHeight;
       sibling = sibling.nextSibling as HTMLTableRowElement;
     }
