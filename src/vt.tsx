@@ -59,8 +59,8 @@ interface vt_opts {
   /**
    * this only needs the scroll.y
    */
-  scroll?: {
-    y: number;
+  scroll: {
+    y: number | string;
   };
 
   /**
@@ -255,7 +255,7 @@ const RowImpl = React.forwardRef<any>(function RowImpl(props, ref) {
  * O(n)
  * returns offset: [head, tail, top] 
  */
-function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['scroll']['y']): [number, number, number] {
+function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, number] {
 
   const {
     row_height,
@@ -263,19 +263,17 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number, scroll_y: VT_CONTEXT['
     overscanRowCount,
   } = ctx;
 
+  const scroll_y = ctx.scroll?.y;
+
   if (typeof scroll_y === "number") {
-    ctx._raw_y = scroll_y as number;
+    ctx._raw_y = scroll_y;
     ctx._y = ctx._raw_y;
   } else if (typeof scroll_y === "string") {
     /* a string, like "calc(100vh - 300px)" */
-    if (ctx.debug)
-      console.warn(`AntD.Table.scroll.y: ${scroll_y}, it may cause performance problems.`);
     ctx._raw_y = scroll_y;
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   } else {
-    if (ctx.debug)
-      console.warn(`AntD.Table.scroll.y: ${scroll_y}, it may cause performance problems.`);
-    console.info("VT will not works well, did you forget to set `scroll.y`?");
+    console.warn("VT: did you forget to set `scroll.y`?");
     ctx._raw_y = null;
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   }
@@ -504,8 +502,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
     // checks every tr's height, which will take some time...
     const offset = scroll_with_offset(
                      ctx,
-                     ctx.f_final_top === TOP_CONTINUE ? ctx.final_top : etop,
-                     ctx.scroll.y);
+                     ctx.f_final_top === TOP_CONTINUE ? ctx.final_top : etop);
 
     const head = offset[0];
     const tail = offset[1];
