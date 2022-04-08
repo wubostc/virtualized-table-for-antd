@@ -149,6 +149,9 @@ interface VT_CONTEXT extends vt_opts {
 }
 
 
+const row_idx = typeof Symbol === 'function' ? Symbol.for('idx') : '$$idx';
+
+
 function default_context(): VT_CONTEXT {
   return {
     vt_state: e_VT_STATE.INIT,
@@ -706,14 +709,25 @@ function VWrapper(props: VWrapperProps) {
   let len = Array.isArray(rows) ? rows.length : 0;
 
   let { _offset_head: head, _offset_tail: tail } = ctx;
-  let trs: any;
+
+  type RowType = React.ReactElement<{
+    indent: number;
+    record: object;
+  }>
+
+  let trs: RowType[];
 
   switch (ctx.vt_state) {
     case e_VT_STATE.INIT:
       if (len >= 0) {
         console.assert(head === 0);
         console.assert(tail === 1);
-        trs = Array.isArray(rows) ? rows.slice(head, tail) : rows;
+        if (Array.isArray(rows)) {
+          trs = rows.slice(head, tail);
+          trs[0].props.record[row_idx] = 0;
+        } else {
+          trs = rows;
+        }
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
@@ -754,7 +768,30 @@ function VWrapper(props: VWrapperProps) {
         }
       }
 
-      trs = len ? rows.slice(head, tail) : rows;
+      /**
+       * tree-structure if indent is not 0
+       *        |  idx                              
+       *        |   0   || 0a                                 0  || 0a
+       *        |   1   || 0b     --collapse occurred--       1  || 0b
+       *        |   2   || - 1                             5->2  || 0c
+       *  head  |   3   || - 1                             6->3  || 0d
+       *        |   4   ||   - 2                           7->4  || 0e
+       *        |   5   || 0c                              8->5  || - 1
+       *        |   6   || 0d                              9->6  ||   - 2
+       *        |   7   || 0e                             10->7  ||     - 3
+       *  tail  |   8   || - 1                            11->8  || 0f
+       *        |   9   ||  - 2     
+       *        |  10   ||    - 3      
+       *        |  11   || 0f     
+       *        |  12   ||    
+       */
+      if (len) {
+        let idx = head;
+        trs = rows.slice(idx, tail);
+        trs.forEach(el => el.props.record[row_idx] = idx++);
+      } else {
+        trs = rows;
+      }
 
       ctx.prev_row_count = ctx.row_count;
     }
@@ -795,12 +832,16 @@ function VTRow(props: VRowProps) {
 
   if (!Array.isArray(children)) {
     // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L211
+    // https://github.com/react-component/table/blob/master/src/Body/index.tsx#L105
+    // only empty or expanded row...
     return <Row {...rest}>{children}</Row>;
   }
 
-  const index: number = children[0].props.index;
-  const prefixCls: string = children[0].props.prefixCls || "ant-table";
-  const last_index = useRef<number>(children[0].props.index);
+  const row_props = children[0].props;
+  const index: number = row_props.record[row_idx];
+  const last_index = useRef(index);
+
+  const expanded_cls = useMemo(() => `.${row_props.prefixCls}-expanded-row`, [row_props.prefixCls]);
 
   useEffect(() => {
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
@@ -828,8 +869,8 @@ function VTRow(props: VRowProps) {
     let h = rowElm.offsetHeight;
     let sibling = rowElm.nextSibling as HTMLTableRowElement;
     // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L212
-    // include heights of all nested rows, in parent rows
-    while (sibling && !sibling.matches(`.${prefixCls}-row-level-0`)) {
+    // include heights of all expanded rows, in parent rows
+    while (sibling && sibling.matches(expanded_cls)) {
       h += sibling.offsetHeight;
       sibling = sibling.nextSibling as HTMLTableRowElement;
     }
