@@ -26,8 +26,8 @@
     /**
      * this only needs the scroll.y
      */
-    scroll?: {
-      y: number;
+    scroll: {
+        y: number | string;
     };
 
     /**
@@ -55,8 +55,6 @@
 + Quick start
   > You need to change your style like following if your Table.size is not default.
   
-  > 如果你的Table.size不是默认的话，你需要修改像下面一样的style。
-
   ```less
   // size={'small'}
   ant-table [vt] > table > .ant-table-tbody > tr > td {
@@ -95,6 +93,9 @@
 + Drag soring
 
   - [Drag soring](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/Drag%20soring.jsx)
+
++ expanded rows & tree-structure
+  has been well supported!
 
 ## License
 

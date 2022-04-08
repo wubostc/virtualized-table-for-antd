@@ -1,3 +1,6 @@
+## 1.1.6
+  1. Supported tree-structure.
+
 ## 1.1.5(zh)
   1. 添加支持 `expandable`，(#106)
      [例子](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test/expandable.tsx).
