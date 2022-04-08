@@ -841,7 +841,7 @@ function VTRow(props: VRowProps) {
   const index: number = row_props.record[row_idx];
   const last_index = useRef(index);
 
-  const expanded_cls = useMemo(() => `${row_props.prefixCls}-expanded-row`, [row_props.prefixCls]);
+  const expanded_cls = useMemo(() => `.${row_props.prefixCls}-expanded-row`, [row_props.prefixCls]);
 
   useEffect(() => {
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
