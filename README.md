@@ -47,6 +47,7 @@
     // pass -1 means scroll to the bottom of the table
     ref?: React.MutableRefObject<{
       scrollTo: (y: number) => void;
+      scrollToIndex: (idx: number) => void;
     }>
   }
   ```
