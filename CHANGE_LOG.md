@@ -1,3 +1,8 @@
+## 1.2.0
+  1. Updated the building tools.
+  2. Supported the React18(#123).
+
+
 ## 1.1.6
   1. Supported tree-structure.
 
