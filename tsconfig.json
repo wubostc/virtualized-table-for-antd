@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "strict": false,
+    "declaration": true,
+    "skipLibCheck": true,
+    "baseUrl": "./",
+    "esModuleInterop": true
+  }
+}

@@ -10,7 +10,8 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import React, { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from "react";
+import { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from "react";
+import * as React from "react";
 
 
 type CustomizeComponent = React.FC<any>;
@@ -113,7 +114,6 @@ interface VT_CONTEXT extends vt_opts {
   // return the last state.
   VTScroll?: (param?: { top: number; left: number }) => { top: number; left: number };
 
-  _React_ptr: any; // a pointer to the instance of `VTable`.
 
   computed_h: number;             // a cache for the WH.
   WH: number;      // Wrapped Height.
@@ -172,14 +172,14 @@ function default_context(): VT_CONTEXT {
     final_top: 0,
     f_final_top: TOP_DONE,
     update_count: 0,
-  } as VT_CONTEXT;
+  } as unknown as VT_CONTEXT;
 }
 
 
 
 /* overload __DIAGNOSIS__. */
 function helper_diagnosis(ctx: VT_CONTEXT): void {
-  if (ctx.hasOwnProperty("CLICK~__DIAGNOSIS__")) return;
+  if (Object.prototype.hasOwnProperty.call(ctx, "CLICK~__DIAGNOSIS__")) return;
   Object.defineProperty(ctx, "CLICK~__DIAGNOSIS__", {
     get() {
       console.debug("OoOoOoO DIAGNOSIS OoOoOoO");
@@ -274,11 +274,11 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
   } else if (typeof scroll_y === "string") {
     /* a string, like "calc(100vh - 300px)" */
     ctx._raw_y = scroll_y;
-    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
+    ctx._y = ctx.wrap_inst.current!.parentElement!.offsetHeight;
   } else {
     console.warn("VT: did you forget to set `scroll.y`?");
-    ctx._raw_y = null;
-    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
+    ctx._raw_y = 0;
+    ctx._y = ctx.wrap_inst.current!.parentElement!.offsetHeight;
   }
 
   console.assert(ctx._y >= 0);
@@ -308,11 +308,11 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
   }
 
   // keep offset row on top and bottom
-  let overscan = overscanRowCount < 0 ? 0 : overscanRowCount;
+  let overscan = overscanRowCount! < 0 ? 0 : overscanRowCount!;
   while (i > 0 && overscan--) {
     _top -= row_height[--i];
   }
-  j += overscanRowCount;
+  j += overscanRowCount!;
   
   if (j > row_count) j = row_count;
   // returns [head, tail, top].
@@ -343,7 +343,7 @@ function set_scroll(ctx: VT_CONTEXT,
 function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
   if (ctx.WH === h) return;
   ctx.WH = h;
-  const s = ctx.wrap_inst.current.style;
+  const s = ctx.wrap_inst.current!.style;
   s.height = h ?
     (s.maxHeight = h + 'px', s.maxHeight) :
     (s.maxHeight = 'unset', s.maxHeight);
@@ -355,8 +355,8 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
   if (!ctx.wrap_inst.current) return;
   const ele = ctx.wrap_inst.current.parentElement;
   /** ie */
-  ele.scrollTop = top;
-  ele.scrollLeft = left;
+  ele!.scrollTop = top;
+  ele!.scrollLeft = left;
 }
 
 
@@ -422,14 +422,17 @@ interface VTableProps extends React.FC {
 }
 
 
-function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
+function VTable(props: VTableProps, ref: React.Ref<{
+  scrollTo: (y: number) => void;
+  scrollToIndex: (idx: number) => void;
+}>) {
   const { style, context, ...rest } = props;
 
 
   // force update this vt.
   const force = useState(0);
 
-  const ref_func = useRef<() => void>();
+  const ref_func = useRef<() => void>(() => {});
 
 
   /*********** DOM ************/
@@ -440,10 +443,10 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
   useMemo(() => {
     Object.assign(ctx, default_context());
     if (ctx.wrap_inst && ctx.wrap_inst.current) {
-      ctx.wrap_inst.current.parentElement.onscroll = null;
+      ctx.wrap_inst.current.parentElement!.onscroll = null;
     }
     ctx.wrap_inst = wrap_inst;
-    ctx.top = ctx.initTop;
+    ctx.top = ctx.initTop!;
     helper_diagnosis(ctx);
   }, []);
 
@@ -457,7 +460,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
   let RAF_update_self: FrameRequestCallback;
 
   /*********** scroll hook ************/
-  const scroll_hook = useCallback((e: SimEvent) => {
+  const scroll_hook = useCallback((e: SimEvent | null) => {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
 
     if (e) {
@@ -488,7 +491,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
     let e: SimEvent;
     // consume the `evq` first.
     if (evq.length) {
-      e = evq.shift();
+      e = evq.shift()!;
     } else {
       return;
     }
@@ -559,7 +562,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
           ctx.onScroll({
             top: etop,
             left: eleft,
-            isEnd: e.end,
+            isEnd: e.end!,
           });
         }
 
@@ -567,12 +570,12 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
           return;
         }
 
-        end = e.end;
+        end = e.end!;
         break;
     }
 
     set_offset(ctx, top, head, tail);
-    set_scroll(ctx, etop, eleft, flag, end);
+    set_scroll(ctx, etop, eleft, flag, end!);
     force[1](++ctx.update_count);
   }, []);
 
@@ -610,7 +613,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
 
 
   useEffect(() => {
-    ctx.wrap_inst.current.parentElement.onscroll = scroll_hook_native;
+    ctx.wrap_inst.current!.parentElement!.onscroll = scroll_hook_native;
   }, [wrap_inst]);
 
 
@@ -676,7 +679,7 @@ function VTable(props: VTableProps, ref: React.Ref<vt_opts['ref']['current']>) {
     [width]
   );
 
-  const Table = ctx.components.table;
+  const Table = ctx.components.table!;
 
   return (
     <div
@@ -703,7 +706,7 @@ function VWrapper(props: VWrapperProps) {
   const measureRow = c[0];
   const rows = c[1];
 
-  const Wrapper = ctx.components.body.wrapper;
+  const Wrapper = ctx.components.body!.wrapper!;
 
   // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L6
   let len = Array.isArray(rows) ? rows.length : 0;
@@ -712,10 +715,10 @@ function VWrapper(props: VWrapperProps) {
 
   type RowType = React.ReactElement<{
     indent: number;
-    record: object;
+    record: Record<typeof row_idx, unknown> & object;
   }>
 
-  let trs: RowType[];
+  let trs: RowType[] = [];
 
   switch (ctx.vt_state) {
     case e_VT_STATE.INIT:
@@ -828,7 +831,7 @@ function VTRow(props: VRowProps) {
 
   const children = props.children;
 
-  const Row = ctx.components.body.row;
+  const Row = ctx.components.body!.row!;
 
   if (!Array.isArray(children)) {
     // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L211
@@ -850,7 +853,7 @@ function VTRow(props: VRowProps) {
     } else {
       console.assert(ctx.vt_state === e_VT_STATE.INIT);
       ctx.vt_state = e_VT_STATE.LOADED;
-      ctx.possible_hight_per_tr = inst.current.offsetHeight;
+      ctx.possible_hight_per_tr = inst.current!.offsetHeight;
       srs_expand(ctx, ctx.row_count, 0, ctx.possible_hight_per_tr);
       // create a timeout task.
       _repainting(ctx, 16);
@@ -866,8 +869,8 @@ function VTRow(props: VRowProps) {
     // for nested(expanded) elements don't calculate height and add on cache as its already accommodated on parent row
     // if (!rowElm.matches(".ant-table-row-level-0")) return;
 
-    let h = rowElm.offsetHeight;
-    let sibling = rowElm.nextSibling as HTMLTableRowElement;
+    let h = rowElm!.offsetHeight;
+    let sibling = rowElm!.nextSibling as HTMLTableRowElement;
     // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L212
     // include heights of all expanded rows, in parent rows
     while (sibling && sibling.matches(expanded_cls)) {
@@ -897,7 +900,7 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
   const { table, body, header } = components;
   ctx.components.body = { ...ctx.components.body, ...body };
   if (body && body.cell) {
-    ctx._vtcomponents.body.cell = body.cell;
+    ctx._vtcomponents.body!.cell = body.cell;
   } 
   if (header) {
     ctx.components.header = header;
@@ -912,7 +915,10 @@ export
 function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
   const ctx = useRef(React.createContext<VT_CONTEXT>({ } as VT_CONTEXT)).current;
   const ctx_value = useContext(ctx);
-  const default_ref: vt_opts['ref'] = useRef();
+  const default_ref: vt_opts['ref'] = useRef({
+    scrollTo: (y: number) => {},
+    scrollToIndex: (idx: number) => {},
+  });
   useMemo(() => {
     return Object.assign(
       ctx_value,
