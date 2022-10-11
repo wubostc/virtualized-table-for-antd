@@ -630,6 +630,18 @@ function VTable(props: VTableProps, ref: React.Ref<{
   }, [wrap_inst]);
 
 
+  // it is usually ignored by raf.
+  useEffect(() => {
+    scroll_hook({
+      flag: SCROLLEVT_BY_HOOK,
+      target: {
+        scrollLeft: ctx.left,
+        scrollTop: ctx.top,
+      }
+    });
+  }, [ctx.scroll.y])
+
+
   // update DOM style.
   useEffect(() => {
     switch (ctx.evt) {
