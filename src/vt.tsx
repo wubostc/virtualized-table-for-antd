@@ -96,8 +96,8 @@ enum e_VT_STATE {
 
 
 interface VT_CONTEXT extends vt_opts {
-  _y: number; // will use the Table.scroll.y.
-  _raw_y: number | string; // this is the same as the `Table.scroll.y`.
+  _y: number; // an actual height of the HTML element '.ant-table-body'.
+  _scroll_y: number | string; // this is the same as the `Table.scroll.y`.
 
   _vtcomponents: TableComponents; // virtual layer.
   components: TableComponents;    // implementation layer.
@@ -146,6 +146,8 @@ interface VT_CONTEXT extends vt_opts {
   f_final_top: number;
 
   update_count: number;
+
+  on_update_wrap_style: () => void; /* it will be called when the `_y` is 0. */
 }
 
 
@@ -266,19 +268,23 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
     overscanRowCount,
   } = ctx;
 
-  const scroll_y = ctx.scroll?.y;
+  ctx._scroll_y = '';
 
-  if (typeof scroll_y === "number") {
-    ctx._raw_y = scroll_y;
-    ctx._y = ctx._raw_y;
-  } else if (typeof scroll_y === "string") {
+  if (ctx.scroll) {
+    const t = typeof ctx.scroll.y;
+    if (t === 'number' || t === 'string')
+      ctx._scroll_y = ctx.scroll.y;
+  }
+
+  if (typeof ctx._scroll_y === "number") {
+    ctx._y = ctx._scroll_y;
+  } else if (typeof ctx._scroll_y === "string") {
     /* a string, like "calc(100vh - 300px)" */
-    ctx._raw_y = scroll_y;
-    ctx._y = ctx.wrap_inst.current!.parentElement!.offsetHeight;
+    // this offsetHeight may be 0!
+    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   } else {
     console.warn("VT: did you forget to set `scroll.y`?");
-    ctx._raw_y = 0;
-    ctx._y = ctx.wrap_inst.current!.parentElement!.offsetHeight;
+    ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   }
 
   console.assert(ctx._y >= 0);
@@ -343,10 +349,11 @@ function set_scroll(ctx: VT_CONTEXT,
 function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
   if (ctx.WH === h) return;
   ctx.WH = h;
-  const s = ctx.wrap_inst.current!.style;
+  const s = ctx.wrap_inst.current.style;
   s.height = h ?
     (s.maxHeight = h + 'px', s.maxHeight) :
     (s.maxHeight = 'unset', s.maxHeight);
+  ctx.on_update_wrap_style();
 }
 
 
@@ -397,6 +404,7 @@ function srs_shrink(ctx: VT_CONTEXT, len: number, prev_len: number): void {
   if (len === 0) {
     ctx.computed_h = 0;
     ctx.row_height.length = 0;
+    ctx.top = 0;
     return;
   }
   const rows = ctx.row_height;
@@ -447,6 +455,17 @@ function VTable(props: VTableProps, ref: React.Ref<{
     }
     ctx.wrap_inst = wrap_inst;
     ctx.top = ctx.initTop!;
+    ctx.on_update_wrap_style = () => {
+      if (ctx._y === 0 && `${ctx._scroll_y}`.length) {
+        scroll_hook({
+          flag: SCROLLEVT_BY_HOOK,
+          target: {
+            scrollTop: ctx.top,
+            scrollLeft: ctx.left,
+          }
+        })
+      }
+    }
     helper_diagnosis(ctx);
   }, []);
 
