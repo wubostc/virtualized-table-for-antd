@@ -353,10 +353,10 @@ function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
 // scrolls the parent element to specified location.
 function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
   if (!ctx.wrap_inst.current) return;
-  const ele = ctx.wrap_inst.current.parentElement;
+  const ele = ctx.wrap_inst.current.parentElement!;
   /** ie */
-  ele!.scrollTop = top;
-  ele!.scrollLeft = left;
+  ele.scrollTop = top;
+  ele.scrollLeft = Math.max(left, ele.scrollLeft);
 }
 
 
