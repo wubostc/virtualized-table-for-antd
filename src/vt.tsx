@@ -268,13 +268,7 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
     overscanRowCount,
   } = ctx;
 
-  ctx._scroll_y = '';
-
-  if (ctx.scroll) {
-    const t = typeof ctx.scroll.y;
-    if (t === 'number' || t === 'string')
-      ctx._scroll_y = ctx.scroll.y;
-  }
+  ctx._scroll_y = ctx.scroll.y;
 
   if (typeof ctx._scroll_y === "number") {
     ctx._y = ctx._scroll_y;
@@ -283,7 +277,7 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
     // this offsetHeight may be 0!
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   } else {
-    console.warn("VT: did you forget to set `scroll.y`?");
+    console.assert(false, 'VT: did you forget to set `scroll.y`?');
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight;
   }
 
