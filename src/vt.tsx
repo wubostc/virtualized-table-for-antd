@@ -10,8 +10,8 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from "react"
-import * as React from "react"
+import { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from 'react'
+import * as React from 'react'
 
 
 type CustomizeComponent = React.FC<any>;
@@ -183,27 +183,27 @@ function default_context(): VT_CONTEXT {
 
 /* overload __DIAGNOSIS__. */
 function helper_diagnosis(ctx: VT_CONTEXT): void {
-  if (Object.prototype.hasOwnProperty.call(ctx, "CLICK~__DIAGNOSIS__")) return
-  Object.defineProperty(ctx, "CLICK~__DIAGNOSIS__", {
+  if (Object.prototype.hasOwnProperty.call(ctx, 'CLICK~__DIAGNOSIS__')) return
+  Object.defineProperty(ctx, 'CLICK~__DIAGNOSIS__', {
     get() {
-      console.debug("OoOoOoO DIAGNOSIS OoOoOoO")
+      console.debug('OoOoOoO DIAGNOSIS OoOoOoO')
       let expect_height = 0
       for (let i = 0; i < ctx.row_count; ++i) {
         expect_height += ctx.row_height[i]
       }
       let color: string, explain: string
       if (expect_height > ctx.computed_h) {
-        color = "color:rgb(15, 179, 9)" // green
-        explain = "lower than expected"
+        color = 'color:rgb(15, 179, 9)' // green
+        explain = 'lower than expected'
       } else if (expect_height < ctx.computed_h) {
-        color = "color:rgb(202, 61, 81)" // red
-        explain = "higher than expected"
+        color = 'color:rgb(202, 61, 81)' // red
+        explain = 'higher than expected'
       } else {
-        color = "color:rgba(0, 0, 0, 0.85)"
-        explain = "normal"
+        color = 'color:rgba(0, 0, 0, 0.85)'
+        explain = 'normal'
       }
       console.debug(`%c%d(%d)(${explain})`, color, expect_height, ctx.computed_h - expect_height)
-      console.debug("OoOoOoOoOoOoOOoOoOoOoOoOo")
+      console.debug('OoOoOoOoOoOoOOoOoOoOoOoOo')
     },
     configurable: false,
     enumerable: false,
@@ -216,7 +216,7 @@ function log_debug(ctx: VT_CONTEXT, msg: string): void {
   if (ctx.debug) {
     const d = new Date()
     const tid = `${d.toLocaleTimeString()}.${d.getMilliseconds()}`
-    console.debug(`%c[${ctx.id}][${tid}][${msg}]`, "color:#a00", ctx)
+    console.debug(`%c[${ctx.id}][${tid}][${msg}]`, 'color:#a00', ctx)
   }
 }
 
@@ -273,9 +273,9 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
 
   ctx._scroll_y = ctx.scroll.y
 
-  if (typeof ctx._scroll_y === "number") {
+  if (typeof ctx._scroll_y === 'number') {
     ctx._y = ctx._scroll_y
-  } else if (typeof ctx._scroll_y === "string") {
+  } else if (typeof ctx._scroll_y === 'string') {
     /* a string, like "calc(100vh - 300px)" */
     // this offsetHeight may be 0!
     ctx._y = ctx.wrap_inst.current.parentElement.offsetHeight
@@ -367,7 +367,7 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 
 function _repainting(ctx: VT_CONTEXT, ms: number): number {
   const fn = (): void => {
-    log_debug(ctx, "REPAINTING")
+    log_debug(ctx, 'REPAINTING')
 
     if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.wrap_inst.current) {
       // output to the buffer
@@ -534,12 +534,12 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
     switch (flag) {
       case SCROLLEVT_INIT:
-        log_debug(ctx, "SCROLLEVT_INIT")
+        log_debug(ctx, 'SCROLLEVT_INIT')
         end = false
         break
 
       case SCROLLEVT_BY_HOOK:
-        log_debug(ctx, "SCROLLEVT_BY_HOOK")
+        log_debug(ctx, 'SCROLLEVT_BY_HOOK')
 
         if (head === prev_head && tail === prev_tail && top === prev_top) {
           ctx.f_final_top = TOP_DONE
@@ -553,7 +553,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         break
 
       case SCROLLEVT_RECOMPUTE:
-        log_debug(ctx, "SCROLLEVT_RECOMPUTE")
+        log_debug(ctx, 'SCROLLEVT_RECOMPUTE')
 
         if (head === prev_head && tail === prev_tail && top === prev_top) {
           HND_RAF.current = 0
@@ -567,7 +567,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
 
       case SCROLLEVT_NATIVE:
-        log_debug(ctx, "SCROLLEVT_NATIVE")
+        log_debug(ctx, 'SCROLLEVT_NATIVE')
 
         HND_RAF.current = 0
         evq.length = 0
@@ -690,16 +690,16 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
   })
 
 
-  style.position = "relative"
+  style.position = 'relative'
   style.top = ctx._offset_top
   const { width, ...rest_style } = style
 
   const wrap_style = useMemo<React.CSSProperties>(
     () => ({
       width,
-      minWidth: "100%",
-      position: "relative",
-      transform: "matrix(1, 0, 0, 1, 0, 0)",
+      minWidth: '100%',
+      position: 'relative',
+      transform: 'matrix(1, 0, 0, 1, 0, 0)',
     }),
     [width]
   )
