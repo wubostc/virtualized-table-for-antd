@@ -214,8 +214,9 @@ function helper_diagnosis(ctx: VT_CONTEXT): void {
 
 function log_debug(ctx: VT_CONTEXT, msg: string): void {
   if (ctx.debug) {
-    const ts = new Date().getTime()
-    console.debug(`%c[${ctx.id}][${ts}][${msg}] vt`, "color:#a00", ctx)
+    const d = new Date()
+    const tid = `${d.toLocaleTimeString()}.${d.getMilliseconds()}`
+    console.debug(`%c[${ctx.id}][${tid}][${msg}]`, "color:#a00", ctx)
   }
 }
 
@@ -460,7 +461,8 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         })
       }
     }
-    helper_diagnosis(ctx)
+    if (process.env.NODE_ENV === 'development')
+      helper_diagnosis(ctx)
   }, [])
 
 
@@ -513,10 +515,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
     let eleft = e.target.scrollLeft
     const flag = e.flag
 
-    if (ctx.debug) {
-      console.debug(`[${ctx.id}][SCROLL] top: %d, left: %d`, etop, eleft)
-    }
-
+    log_debug(ctx, `raf top: ${etop}, left: ${eleft}`)
 
     // checks every tr's height, which will take some time...
     const offset = scroll_with_offset(
