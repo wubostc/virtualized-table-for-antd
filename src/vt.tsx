@@ -49,9 +49,14 @@ const TOP_DONE     = 1
 
 
 
+interface RefObject {
+  scrollTo: (y: number) => void;
+  scrollToIndex: (idx: number) => void;
+}
+
 export
-interface vt_opts {
-  id?: number;
+interface VtOpts {
+  id?: number | string;
   /**
    * @default 5
    */
@@ -79,10 +84,7 @@ interface vt_opts {
 
 
   // pass -1 means scroll to the bottom of the table
-  ref?: React.MutableRefObject<{
-    scrollTo: (y: number) => void;
-    scrollToIndex: (idx: number) => void;
-  }>;
+  ref?: React.MutableRefObject<RefObject>;
 }
 
 /**
@@ -95,7 +97,7 @@ enum e_VT_STATE {
 }
 
 
-interface VT_CONTEXT extends vt_opts {
+interface VT_CONTEXT extends VtOpts {
   _y: number; // an actual height of the HTML element '.ant-table-body'.
   _scroll_y: number | string; // this is the same as the `Table.scroll.y`.
 
@@ -417,17 +419,15 @@ function set_tr_cnt(ctx: VT_CONTEXT, n: number): void {
 }
 
 
-interface VTableProps extends React.FC {
+interface VTableProps {
   style: React.CSSProperties;
   context: React.Context<VT_CONTEXT>;
+  children: React.ReactNode;
   [prop: string]: any;
 }
 
 
-function VTable(props: VTableProps, ref: React.Ref<{
-  scrollTo: (y: number) => void;
-  scrollToIndex: (idx: number) => void;
-}>) {
+const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, ref) => {
   const { style, context, ...rest } = props
 
 
@@ -720,16 +720,16 @@ function VTable(props: VTableProps, ref: React.Ref<{
 }
 
 
-interface VWrapperProps extends React.FC {
+interface VWrapperProps {
   style: React.CSSProperties;
   ctx: VT_CONTEXT;
-  [prop: string]: any;
+  children: React.ReactNode;
 }
 
-function VWrapper(props: VWrapperProps) {
-  const { children: c, ctx, ...restProps } = props
-  const measureRow = c[0]
-  const rows = c[1]
+const VWrapper: React.FC<VWrapperProps> = (props) => {
+  const { children, ctx, ...restProps } = props
+  const measureRow = children[0]
+  const rows = children[1]
 
   const Wrapper = ctx.components.body!.wrapper!
 
@@ -839,24 +839,22 @@ function VWrapper(props: VWrapperProps) {
   )
 }
 
-interface VRowProps extends React.FC {
+interface VRowProps {
   style: React.CSSProperties;
-  context: VT_CONTEXT;
-  [prop: string]: any;
+  ctx: VT_CONTEXT;
+  children: React.ReactNode;
 }
 
 
-function VTRow(props: VRowProps) {
+const VTRow: React.FC<VRowProps> = (props) => {
 
   const inst = React.createRef<HTMLTableRowElement>()
 
-  const { context, ...rest } = props
-
-  const ctx = context
+  const { ctx, ...rest } = props
 
   const children = props.children
 
-  const Row = ctx.components.body!.row!
+  const Row = ctx.components.body.row
 
   if (!Array.isArray(children)) {
     // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L211
@@ -925,7 +923,7 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
   const { table, body, header } = components
   ctx.components.body = { ...ctx.components.body, ...body }
   if (body && body.cell) {
-    ctx._vtcomponents.body!.cell = body.cell
+    ctx._vtcomponents.body.cell = body.cell
   } 
   if (header) {
     ctx.components.header = header
@@ -937,10 +935,10 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
 }
 
 export
-function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
+function init(fnOpts: () => VtOpts, deps: React.DependencyList): VT_CONTEXT {
   const ctx = useRef(React.createContext<VT_CONTEXT>({ } as VT_CONTEXT)).current
   const ctx_value = useContext(ctx)
-  const default_ref: vt_opts['ref'] = useRef({
+  const default_ref: VtOpts['ref'] = useRef({
     scrollTo: (y: number) => {},
     scrollToIndex: (idx: number) => {},
   })
@@ -948,7 +946,7 @@ function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
     return Object.assign(
       ctx_value,
       {
-        id: +new Date(),
+        id: (+new Date()).toString(36).slice(4),
         initTop: 0,
         overscanRowCount: 5,
         debug: false,
@@ -958,13 +956,13 @@ function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
     }, deps)
 
   useMemo(() => {
-    const VTable2 = React.forwardRef(VTable)
+    const VT = React.forwardRef(VTable)
 
     // set the virtual layer.
     ctx_value._vtcomponents = {
-      table: (props) => <VTable2 {...props} context={ctx} ref={ctx_value.ref} />,
+      table: props => <VT {...props} context={ctx} ref={ctx_value.ref} />,
       body: {
-        wrapper: (props: any) => {
+        wrapper: props => {
           return (
             <ctx.Consumer>
               {(/* value */) => {
@@ -975,7 +973,7 @@ function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT {
             </ctx.Consumer>
           )
         },
-        row: (props) => <VTRow {...props} context={ctx_value} />,
+        row: props => <VTRow {...props} ctx={ctx_value} />,
       }
     }
     // set the default implementation layer.

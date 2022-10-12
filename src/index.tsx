@@ -10,7 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 import { useRef, useMemo } from "react"
-import { TableComponents, _set_components, vt_opts, init } from "./vt"
+import { TableComponents, _set_components, VtOpts, init } from "./vt"
 
 const _brower = 1
 const _node = 2
@@ -37,28 +37,42 @@ function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  * // ... your code
  * 
  * 
- * // `set_components` is the same as the setComponents
- * const [ vt, set_components ] = useVT(() => ({ scroll: { y: 600 } }));
+ * const y = 600;
+ * const [ vt, setComponents, vtRef ] = useVT(() => ({
+ *  scroll: {
+ *    y
+ *  }
+ * }),
+ * [y]);
  * 
+ * // useEffect(() => {
+ * //  setComponents({
+ * //    body: {
+ * //      cell: MyCell,
+ * //    }
+ * //  })
+ * // });
+ * 
+ * // useEffect(() => vtRef.current.toScroll(100), []);
  * 
  * return (
  *  <Table
  *   columns={columns}
  *   dataSource={dataSource}
- *   scroll={{ x: 1000, y: 600 }}
+ *   scroll={{ x: 1000, y }}
  *   components={vt}
  *  />
  * );
  * }
  */
-function useVT(fnOpts: () => vt_opts, deps: React.DependencyList = []):
+function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
   [
     TableComponents,
     (components: TableComponents) => void,
-    vt_opts['ref']
+    VtOpts['ref']
   ]
 {
-  const ctx = init(fnOpts, deps)
+  const ctx = init(fnOpts, deps || [])
   const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components))
 
 
