@@ -20,6 +20,7 @@
   },
   "rules": {
     "camelcase": "off",
+    "semi": ["error", "never"],
     "@typescript-eslint/camelcase": "off",
     "no-console": ["error", { "allow": ["debug", "warn", "assert", "info"] }],
     "@typescript-eslint/class-name-casing": "off",

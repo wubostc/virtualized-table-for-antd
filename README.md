@@ -16,8 +16,8 @@
 
 + the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
   ```typescript
-  interface vt_opts {
-    id?: number;
+  interface VtOpts {
+    id?: number | string;
     /**
      * @default 5
      */

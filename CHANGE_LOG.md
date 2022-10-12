@@ -1,3 +1,9 @@
+# 1.2.1
+  1. fixed [#126](https://github.com/wubostc/virtualized-table-for-antd/issues/126).
+  2. fixed [#125](https://github.com/wubostc/virtualized-table-for-antd/issues/125).
+  3. fixed [#122](https://github.com/wubostc/virtualized-table-for-antd/issues/122).
+  4. fixed a [bug](https://github.com/wubostc/virtualized-table-for-antd/commit/81b91bb68c2ba0bd3196487b708a5b59ec02f6b8).
+
 ## 1.2.0
   1. Updated the building tools.
   2. Supported the React18(#123).

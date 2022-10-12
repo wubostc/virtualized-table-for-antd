@@ -9,25 +9,20 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useRef, useMemo } from "react";
-import { TableComponents, _set_components, vt_opts, init } from "./vt";
+import { TableComponents, _set_components, VtOpts, init } from './vt'
 
-const _brower = 1;
-const _node = 2;
+const _brower = 1
+const _node = 2
 
-(function () {
-  const env = typeof window === 'object' && window instanceof Window ? _brower : _node;
+;(function () {
+  const env = typeof window === 'object' && window instanceof Window ? _brower : _node
   if (env & _brower) {
-    if (!Object.hasOwnProperty.call(window, "requestAnimationFrame") && !window.requestAnimationFrame)
-      throw new Error("Please using the modern browers or appropriate polyfill!");
+    if (!Object.hasOwnProperty.call(window, 'requestAnimationFrame') && !window.requestAnimationFrame)
+      throw new Error('Please using the modern browers or appropriate polyfill!')
   }
-})();
+})()
 
 
-function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
-  const ref = useRef(null);
-  return useMemo(() => factory(...args), [ref.current]);
-}
 
 /**
  * @example
@@ -37,32 +32,45 @@ function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
  * // ... your code
  * 
  * 
- * // `set_components` is the same as the setComponents
- * const [ vt, set_components ] = useVT(() => ({ scroll: { y: 600 } }));
+ * const y = 600;
+ * const [ vt, setComponents, vtRef ] = useVT(() => ({
+ *  scroll: {
+ *    y
+ *  }
+ * }),
+ * [y]);
  * 
+ * // useEffect(() => {
+ * //  setComponents({
+ * //    body: {
+ * //      cell: MyCell,
+ * //    }
+ * //  })
+ * // });
+ * 
+ * // useEffect(() => vtRef.current.toScroll(100), []);
  * 
  * return (
  *  <Table
  *   columns={columns}
  *   dataSource={dataSource}
- *   scroll={{ x: 1000, y: 600 }}
+ *   scroll={{ x: 1000, y }}
  *   components={vt}
  *  />
  * );
  * }
  */
-function useVT(fnOpts: () => vt_opts, deps: React.DependencyList = []):
+function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
   [
     TableComponents,
     (components: TableComponents) => void,
-    vt_opts['ref']
+    VtOpts['ref']
   ]
 {
-  const ctx = init(fnOpts, deps);
-  const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components));
+  const ctx = init(fnOpts, deps || [])
 
 
-  return [ctx._vtcomponents, set, ctx.ref];
+  return [ctx._vtcomponents, (components: TableComponents) => _set_components(ctx, components), ctx.ref]
 }
 
-export { useVT };
+export { useVT }
