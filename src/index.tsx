@@ -9,24 +9,24 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useRef, useMemo } from "react";
-import { TableComponents, _set_components, vt_opts, init } from "./vt";
+import { useRef, useMemo } from "react"
+import { TableComponents, _set_components, vt_opts, init } from "./vt"
 
-const _brower = 1;
-const _node = 2;
+const _brower = 1
+const _node = 2
 
-(function () {
-  const env = typeof window === 'object' && window instanceof Window ? _brower : _node;
+;(function () {
+  const env = typeof window === 'object' && window instanceof Window ? _brower : _node
   if (env & _brower) {
     if (!Object.hasOwnProperty.call(window, "requestAnimationFrame") && !window.requestAnimationFrame)
-      throw new Error("Please using the modern browers or appropriate polyfill!");
+      throw new Error("Please using the modern browers or appropriate polyfill!")
   }
-})();
+})()
 
 
 function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
-  const ref = useRef(null);
-  return useMemo(() => factory(...args), [ref.current]);
+  const ref = useRef(null)
+  return useMemo(() => factory(...args), [ref.current])
 }
 
 /**
@@ -58,11 +58,11 @@ function useVT(fnOpts: () => vt_opts, deps: React.DependencyList = []):
     vt_opts['ref']
   ]
 {
-  const ctx = init(fnOpts, deps);
-  const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components));
+  const ctx = init(fnOpts, deps)
+  const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components))
 
 
-  return [ctx._vtcomponents, set, ctx.ref];
+  return [ctx._vtcomponents, set, ctx.ref]
 }
 
-export { useVT };
+export { useVT }
