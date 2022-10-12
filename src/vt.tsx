@@ -502,12 +502,12 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
     const evq  = event_queue
 
     let e: SimEvent
-    // consume the `evq` first.
-    if (evq.length) {
-      e = evq.shift()!
-    } else {
+    if (!evq.length) {
       return
     }
+
+    // this always consumes the last element of the event queue.
+    e = evq.pop()
 
     let etop = e.target.scrollTop
     let eleft = e.target.scrollLeft
@@ -559,7 +559,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         if (head === prev_head && tail === prev_tail && top === prev_top) {
           HND_RAF.current = 0
 
-          if (event_queue.length) scroll_hook(null) // consume the next.
+          if (evq.length) scroll_hook(null) // consume the next.
           return
         }
 
@@ -571,6 +571,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         log_debug(ctx, "SCROLLEVT_NATIVE")
 
         HND_RAF.current = 0
+        evq.length = 0
         if (ctx.onScroll) {
           ctx.onScroll({
             top: etop,
