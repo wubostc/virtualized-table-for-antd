@@ -9,7 +9,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useRef, useMemo } from 'react'
 import { TableComponents, _set_components, VtOpts, init } from './vt'
 
 const _brower = 1
@@ -24,10 +23,6 @@ const _node = 2
 })()
 
 
-function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T {
-  const ref = useRef(null)
-  return useMemo(() => factory(...args), [ref.current])
-}
 
 /**
  * @example
@@ -73,10 +68,9 @@ function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
   ]
 {
   const ctx = init(fnOpts, deps || [])
-  const set = useOnce(() => (components: TableComponents) => _set_components(ctx, components))
 
 
-  return [ctx._vtcomponents, set, ctx.ref]
+  return [ctx._vtcomponents, (components: TableComponents) => _set_components(ctx, components), ctx.ref]
 }
 
 export { useVT }
