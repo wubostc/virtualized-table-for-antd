@@ -150,11 +150,9 @@ interface VT_CONTEXT extends VtOpts {
   update_count: number;
 
   on_update_wrap_style: () => void; /* it will be called when the `_y` is 0. */
+
+  indexMap: WeakMap<object, number>;
 }
-
-
-const row_idx = typeof Symbol === 'function' ? Symbol.for('idx') : '$$idx'
-
 
 function default_context(): VT_CONTEXT {
   return {
@@ -176,6 +174,7 @@ function default_context(): VT_CONTEXT {
     final_top: 0,
     f_final_top: TOP_DONE,
     update_count: 0,
+    indexMap: new WeakMap()
   } as unknown as VT_CONTEXT
 }
 
@@ -740,7 +739,7 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
 
   type RowType = React.ReactElement<{
     indent: number;
-    record: Record<typeof row_idx, unknown> & object;
+    record: object;
   }>
 
   let trs: RowType[] = []
@@ -752,7 +751,7 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
         console.assert(tail === 1)
         if (Array.isArray(rows)) {
           trs = rows.slice(head, tail)
-          trs[0].props.record[row_idx] = 0
+          ctx.indexMap.set(trs[0].props.record, 0)
         } else {
           trs = rows
         }
@@ -816,7 +815,7 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
       if (len) {
         let idx = head
         trs = rows.slice(idx, tail)
-        trs.forEach(el => el.props.record[row_idx] = idx++)
+        trs.forEach(el => ctx.indexMap.set(el.props.record, idx++))
       } else {
         trs = rows
       }
@@ -864,7 +863,7 @@ const VTRow: React.FC<VRowProps> = (props) => {
   }
 
   const row_props = children[0].props
-  const index: number = row_props.record[row_idx]
+  const index: number = ctx.indexMap.get(row_props.record)
   const last_index = useRef(index)
 
   const expanded_cls = useMemo(() => `.${row_props.prefixCls}-expanded-row`, [row_props.prefixCls])
