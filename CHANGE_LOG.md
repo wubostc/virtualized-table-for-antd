@@ -1,3 +1,9 @@
+# 1.2.2
+  1. Supported immutable records([#120](https://github.com/wubostc/virtualized-table-for-antd/issues/120))([#132](https://github.com/wubostc/virtualized-table-for-antd/issues/120)).
+  2. Fixed the return type(ts) of the `useVT`.
+  3. Supported antd-v5.
+  4. Improved the function `helper_diagnosis`.
+
 # 1.2.1
   1. fixed [#126](https://github.com/wubostc/virtualized-table-for-antd/issues/126).
   2. fixed [#125](https://github.com/wubostc/virtualized-table-for-antd/issues/125).
