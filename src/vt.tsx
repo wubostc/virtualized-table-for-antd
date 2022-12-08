@@ -183,9 +183,7 @@ function default_context(): VT_CONTEXT {
 /* overload __DIAGNOSIS__. */
 function helper_diagnosis(ctx: VT_CONTEXT): void {
   if (Object.prototype.hasOwnProperty.call(ctx, 'CLICK~__DIAGNOSIS__')) return
-  Object.defineProperty(ctx, 'CLICK~__DIAGNOSIS__', {
-    get() {
-      console.debug('OoOoOoO DIAGNOSIS OoOoOoO')
+  function diagnosis(flag: boolean) {
       let expect_height = 0
       for (let i = 0; i < ctx.row_count; ++i) {
         expect_height += ctx.row_height[i]
@@ -201,12 +199,28 @@ function helper_diagnosis(ctx: VT_CONTEXT): void {
         color = 'color:rgba(0, 0, 0, 0.85)'
         explain = 'normal'
       }
-      console.debug(`%c%d(%d)(${explain})`, color, expect_height, ctx.computed_h - expect_height)
-      console.debug('OoOoOoOoOoOoOOoOoOoOoOoOo')
+      const ret = ctx.computed_h - expect_height
+      if (flag) {
+        console.debug('OoOoOoO DIAGNOSIS OoOoOoO')
+        console.debug(`%c%d(%d)(${explain})`, color, expect_height, ctx.computed_h - expect_height)
+        console.debug('OoOoOoOoOoOoOOoOoOoOoOoOo')
+      }
+      return ret
+  }
+  Object.defineProperty(ctx, 'CLICK~__DIAGNOSIS__', {
+    get() {
+      diagnosis(true)
     },
     configurable: false,
     enumerable: false,
   })
+  function cb() {
+    if (diagnosis(false) !== 0) {
+      window.alert('vt: an error occurred!')
+    }
+    window.requestIdleCallback(cb)
+  }
+  ctx.debug && cb()
 }
 
 
@@ -423,7 +437,6 @@ interface VTableProps {
   style: React.CSSProperties;
   context: React.Context<VT_CONTEXT>;
   children: React.ReactNode;
-  [prop: string]: any;
 }
 
 
@@ -460,7 +473,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         })
       }
     }
-    if (process.env.NODE_ENV === 'development')
+    if (process.env.NODE_ENV !== 'production')
       helper_diagnosis(ctx)
   }, [])
 
@@ -688,30 +701,37 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
     }
   })
 
-
-  style.position = 'relative'
-  style.top = ctx._offset_top
-  const { width, ...rest_style } = style
-
-  const wrap_style = useMemo<React.CSSProperties>(
+  const wrapStyle = useMemo<React.CSSProperties>(
     () => ({
-      width,
+      width: style.width,
       minWidth: '100%',
       position: 'relative',
-      transform: 'matrix(1, 0, 0, 1, 0, 0)',
+      // transform: 'matrix(1, 0, 0, 1, 0, 0)',
     }),
-    [width]
+    [style.width]
   )
 
-  const Table = ctx.components.table!
+  const tableStyle = useMemo<React.CSSProperties>(() => (
+    {
+      ...style,
+      width: void 0,
+      position: 'relative',
+      top: ctx._offset_top,
+    }),
+    [ctx._offset_top]
+  )
+
+  const internalCtx = useMemo(() => ({ ...ctx }), [ctx.update_count])
+
+  const Table = ctx.components.table
 
   return (
     <div
       ref={wrap_inst}
-      style={wrap_style}
+      style={wrapStyle}
     >
-      <context.Provider value={{...ctx}}>
-        <Table {...rest} style={rest_style} />
+      <context.Provider value={internalCtx}>
+        <Table {...rest} style={tableStyle} />
       </context.Provider>
     </div>
   )
@@ -720,17 +740,15 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
 
 interface VWrapperProps {
-  style: React.CSSProperties;
   ctx: VT_CONTEXT;
+  className: string;
   children: React.ReactNode;
 }
 
 const VWrapper: React.FC<VWrapperProps> = (props) => {
-  const { children, ctx, ...restProps } = props
+  const { children, className, ctx } = props
   const measureRow = children[0]
   const rows = children[1]
-
-  const Wrapper = ctx.components.body!.wrapper!
 
   // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L6
   let len = Array.isArray(rows) ? rows.length : 0
@@ -829,9 +847,10 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
       break
   }
 
+  const Wrapper = ctx.components.body.wrapper
 
   return (
-    <Wrapper {...restProps}>
+    <Wrapper className={className}>
       {measureRow}
       {trs}
     </Wrapper>
@@ -847,7 +866,7 @@ interface VRowProps {
 
 const VTRow: React.FC<VRowProps> = (props) => {
 
-  const inst = React.createRef<HTMLTableRowElement>()
+  const ref = React.createRef<HTMLTableRowElement>()
 
   const { ctx, ...rest } = props
 
@@ -875,7 +894,7 @@ const VTRow: React.FC<VRowProps> = (props) => {
     } else {
       console.assert(ctx.vt_state === e_VT_STATE.INIT)
       ctx.vt_state = e_VT_STATE.LOADED
-      ctx.possible_hight_per_tr = inst.current!.offsetHeight
+      ctx.possible_hight_per_tr = ref.current!.offsetHeight
       srs_expand(ctx, ctx.row_count, 0, ctx.possible_hight_per_tr)
       // create a timeout task.
       _repainting(ctx, 16)
@@ -886,7 +905,7 @@ const VTRow: React.FC<VRowProps> = (props) => {
 
 
   useEffect(() => {
-    const rowElm = inst.current
+    const rowElm = ref.current
 
     // for nested(expanded) elements don't calculate height and add on cache as its already accommodated on parent row
     // if (!rowElm.matches(".ant-table-row-level-0")) return;
@@ -911,7 +930,7 @@ const VTRow: React.FC<VRowProps> = (props) => {
     repainting(ctx)
   })
 
-  return <Row {...rest} ref={inst} />
+  return <Row {...rest} ref={ref} />
 }
 
 
@@ -961,6 +980,7 @@ function init(fnOpts: () => VtOpts, deps: React.DependencyList): VT_CONTEXT {
     ctx_value._vtcomponents = {
       table: props => <VT {...props} context={ctx} ref={ctx_value.ref} />,
       body: {
+        // https://github.com/react-component/table/blob/master/src/Body/index.tsx#L114
         wrapper: props => {
           return (
             <ctx.Consumer>
