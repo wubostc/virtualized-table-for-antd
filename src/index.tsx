@@ -64,7 +64,7 @@ function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
   [
     TableComponents,
     (components: TableComponents) => void,
-    VtOpts['ref']
+    Required<VtOpts>['ref']
   ]
 {
   const ctx = init(fnOpts, deps || [])
