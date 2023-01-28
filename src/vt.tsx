@@ -166,6 +166,8 @@ interface VT_CONTEXT extends VtOpts {
 
   // computing queue.
   cq: { index: number; func: () => void }[];
+
+  retry_count: number;
 }
 
 function default_context(): VT_CONTEXT {
@@ -190,6 +192,7 @@ function default_context(): VT_CONTEXT {
     update_count: 0,
     indexMap: new WeakMap(),
     HND_PAINT: 0,
+    retry_count: 5,
   } as VT_CONTEXT
 }
 
@@ -450,6 +453,8 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
   const ref_func = useRef<() => void>(() => {})
 
+  // eslint-disable-next-line prefer-const
+  let scroll_hook: (e?: SimEvent | Event) => void
 
   /*********** DOM ************/
   const wrap_inst = useMemo(() => React.createRef<HTMLDivElement>(), [])
@@ -459,7 +464,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
   useMemo(() => {
     Object.assign(ctx, default_context())
     if (ctx.wrap_inst && ctx.wrap_inst.current) {
-      ctx.wrap_inst.current.parentElement.onscroll = null
+      ctx.wrap_inst.current.parentElement.removeEventListener('scroll', scroll_hook as any)
     }
     ctx.wrap_inst = wrap_inst
     ctx.top = ctx.initTop
@@ -507,27 +512,48 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
   let RAF_update_self: FrameRequestCallback
 
   /*********** scroll hook ************/
-  const scroll_hook = useCallback((e?: SimEvent) => {
+  scroll_hook = useCallback((ev?: SimEvent | Event) => {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return
 
-    if (e) {
-      event_queue.push(e)
+    const t0 = performance.now()
+
+    if (ev) {
+      if ('flag' in ev) {
+        event_queue.push(ev)
+      } else {
+        const target = ev.target as any
+        event_queue.push({
+          target: {
+            scrollTop: target.scrollTop,
+            scrollLeft: target.scrollLeft,
+          },
+          end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
+          flag: SCROLLEVT_NATIVE,
+        })
+      }
+
 
       if (ctx.f_final_top === TOP_CONTINUE) {
-        e.flag = SCROLLEVT_BY_HOOK
-        return RAF_update_self(0)
+        return RAF_update_self(t0)
       }
     }
 
     if (ctx.HND_RAF) return
-
-    ctx.HND_RAF = setTimeout(RAF_update_self)
+    ctx.HND_RAF = window.setTimeout(() => Promise.resolve().then(() => RAF_update_self(t0)))
   }, [])
 
 
   /* requestAnimationFrame callback */
-  RAF_update_self = useCallback((_: number) => {
+  RAF_update_self = useCallback((time: number) => {
     ctx.HND_RAF = 0
+
+    const t1 = performance.now()
+    if (t1 - time > 10 && ctx.retry_count-- > 0) {
+      scroll_hook()
+      return
+    }
+
+    ctx.retry_count = 5
 
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return
 
@@ -648,16 +674,13 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
 
   useEffect(() => {
-    wrap_inst.current.parentElement.onscroll = (ev) => {
-      const target = ev.target as any
-      scroll_hook({
-        target: {
-          scrollTop: target.scrollTop,
-          scrollLeft: target.scrollLeft,
-        },
-        end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
-        flag: SCROLLEVT_NATIVE,
+    const el = wrap_inst.current.parentElement
+    try {
+      el.addEventListener('scroll', scroll_hook as any, {
+        passive: true,
       })
+    } catch {
+      el.addEventListener('scroll', scroll_hook as any, false)
     }
   }, [wrap_inst.current])
 
