@@ -844,9 +844,9 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
       } else if (len > prev_len) {
         const row_h = ctx.row_height
         if ((len - row_h.length) > 0) {
-          srs_expand(ctx, len, row_h.length, ctx.possible_hight_per_tr)
+          srs_expand(ctx, len, prev_len, ctx.possible_hight_per_tr)
         } else {
-          // calculate the total height quickly.
+          // using an existing array.
           row_h.fill(ctx.possible_hight_per_tr, prev_len, len)
           ctx.computed_h += ctx.possible_hight_per_tr * (len - prev_len)
         }
