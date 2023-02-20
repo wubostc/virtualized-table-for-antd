@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 
 /*
 The MIT License (MIT)
@@ -10,7 +11,7 @@ The above copyright notice and this permission notice shall be included in all c
 */
 
 
-import { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from 'react'
+import { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle, useLayoutEffect } from 'react'
 import * as React from 'react'
 
 
@@ -97,6 +98,15 @@ enum e_VT_STATE {
 }
 
 
+
+type SimEvent = {
+  target: { scrollTop: number; scrollLeft: number };
+  flag: number;
+  end?: boolean;
+};
+
+
+
 interface VT_CONTEXT extends VtOpts {
   _y: number; // an actual height of the HTML element '.ant-table-body'.
   _scroll_y: number | string; // this is the same as the `Table.scroll.y`.
@@ -122,6 +132,7 @@ interface VT_CONTEXT extends VtOpts {
                    // it's the newest value of `wrap_inst`'s height to update.
 
   HND_PAINT: number;      // a handle for Batch Repainting.
+  HND_RAF: number;        // a handler of requestAnimationFrame
 
 
   // stores the variables for the offset following.
@@ -152,6 +163,11 @@ interface VT_CONTEXT extends VtOpts {
   on_update_wrap_style: () => void; /* it will be called when the `_y` is 0. */
 
   indexMap: WeakMap<object, number>;
+
+  // computing queue.
+  cq: { index: number; func: () => void }[];
+
+  retry_count: number;
 }
 
 function default_context(): VT_CONTEXT {
@@ -174,8 +190,10 @@ function default_context(): VT_CONTEXT {
     final_top: 0,
     f_final_top: TOP_DONE,
     update_count: 0,
-    indexMap: new WeakMap()
-  } as unknown as VT_CONTEXT
+    indexMap: new WeakMap(),
+    HND_PAINT: 0,
+    retry_count: 5,
+  } as VT_CONTEXT
 }
 
 
@@ -217,8 +235,9 @@ function helper_diagnosis(ctx: VT_CONTEXT): void {
   function cb() {
     if (diagnosis(false) !== 0) {
       window.alert('vt: an error occurred!')
+      return
     }
-    window.requestIdleCallback(cb)
+    window.requestIdleCallback ? window.requestIdleCallback(cb) : window.setTimeout(cb)
   }
   ctx.debug && cb()
 }
@@ -227,31 +246,15 @@ function helper_diagnosis(ctx: VT_CONTEXT): void {
 
 function log_debug(ctx: VT_CONTEXT, msg: string): void {
   if (ctx.debug) {
+    if (msg[0] === '+') {
+      return console.debug(msg.slice(1))
+    }
     const d = new Date()
     const tid = `${d.toLocaleTimeString()}.${d.getMilliseconds()}`
     console.debug(`%c[${ctx.id}][${tid}][${msg}]`, 'color:#a00', ctx)
   }
 }
 
-
-type SimEvent = {
-  target: { scrollTop: number; scrollLeft: number };
-  flag: number;
-  end?: boolean;
-};
-
-// the factory function returns a SimEvent.
-function make_evt(ne: Event): SimEvent {
-  const target: any = ne.target
-  return {
-    target: {
-      scrollTop: target.scrollTop,
-      scrollLeft: target.scrollLeft,
-    },
-    end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
-    flag: SCROLLEVT_NATIVE,
-  }
-}
 
 
 
@@ -356,16 +359,6 @@ function set_scroll(ctx: VT_CONTEXT,
 }
 
 
-function update_wrap_style(ctx: VT_CONTEXT, h: number): void {
-  if (ctx.WH === h) return
-  ctx.WH = h
-  const s = ctx.wrap_inst.current.style
-  s.height = h ?
-    (s.maxHeight = h + 'px', s.maxHeight) :
-    (s.maxHeight = 'unset', s.maxHeight)
-  ctx.on_update_wrap_style()
-}
-
 
 // scrolls the parent element to specified location.
 function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
@@ -378,27 +371,39 @@ function scroll_to(ctx: VT_CONTEXT, top: number, left: number): void {
 
 
 
-function _repainting(ctx: VT_CONTEXT, ms: number): number {
-  const fn = (): void => {
-    log_debug(ctx, 'REPAINTING')
+function repainting(ctx: VT_CONTEXT): number {
+  if (ctx.HND_PAINT) return
 
-    if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.wrap_inst.current) {
-      // output to the buffer
-      update_wrap_style(ctx, ctx.computed_h)
+  const { cq, wrap_inst } = ctx
+
+  const fn = (): void => {
+    ctx.HND_PAINT = 0
+
+    // BATCH PROCESS in once time...
+    for (let i = 0; i < cq.length; ++i) {
+      if (cq[i].index >= ctx._offset_head && cq[i].index < ctx._offset_tail) {
+        cq[i].func()
+      }
     }
 
-    // free this handle manually.
-    ctx.HND_PAINT = 0
+    if (ctx.vt_state !== e_VT_STATE.RUNNING || !wrap_inst.current) return
+
+    const h = ctx.computed_h
+
+    if (ctx.WH === h) return
+
+    ctx.WH = h
+    const s = wrap_inst.current.style
+    s.height = h ?
+      (s.maxHeight = h + 'px', s.maxHeight) :
+      (s.maxHeight = 'unset', s.maxHeight)
+
+    ctx.on_update_wrap_style()
   }
 
-  return ms < 0 ? window.requestAnimationFrame(fn) : window.setTimeout(fn, ms)
-}
 
-
-// a wrapper function for `_repainting`.
-function repainting(ctx: VT_CONTEXT): void {
-  if (ctx.HND_PAINT > 0) return
-  ctx.HND_PAINT = _repainting(ctx, -1)
+  ctx.HND_PAINT = ctx.evt === SCROLLEVT_NATIVE ? window.requestAnimationFrame(fn)
+                                : window.setTimeout(fn)
 }
 
 
@@ -449,6 +454,8 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
   const ref_func = useRef<() => void>(() => {})
 
+  // eslint-disable-next-line prefer-const
+  let scroll_hook: (e?: SimEvent | Event) => void
 
   /*********** DOM ************/
   const wrap_inst = useMemo(() => React.createRef<HTMLDivElement>(), [])
@@ -458,10 +465,10 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
   useMemo(() => {
     Object.assign(ctx, default_context())
     if (ctx.wrap_inst && ctx.wrap_inst.current) {
-      ctx.wrap_inst.current.parentElement!.onscroll = null
+      ctx.wrap_inst.current.parentElement.removeEventListener('scroll', scroll_hook as any)
     }
     ctx.wrap_inst = wrap_inst
-    ctx.top = ctx.initTop!
+    ctx.top = ctx.initTop
     ctx.on_update_wrap_style = () => {
       if (ctx._y === 0 && `${ctx._scroll_y}`.length) {
         scroll_hook({
@@ -473,44 +480,84 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         })
       }
     }
+
     if (process.env.NODE_ENV !== 'production')
       helper_diagnosis(ctx)
+
+    ctx.cq = []
+    let pfirst = 0
+    // let plast = 0
+    let circleBufferSize = 0
+    ctx.cq.push = (item) => {
+      if (ctx.vt_state !== e_VT_STATE.RUNNING) return
+
+      const size = ctx._offset_tail - ctx._offset_head + ctx.overscanRowCount * 2 + 10
+      circleBufferSize = Math.max(circleBufferSize, size)
+
+      if (pfirst > circleBufferSize) {
+        pfirst = 0
+      }
+
+      ctx.cq[pfirst++] = item
+
+      return 0
+    }
   }, [])
 
 
   /*********** scroll event ************/
   const event_queue = useRef<SimEvent[]>([]).current
 
-  const HND_RAF = useRef(0) // handle of requestAnimationFrame
 
   /* eslint-disable prefer-const */
   let RAF_update_self: FrameRequestCallback
 
   /*********** scroll hook ************/
-  const scroll_hook = useCallback((e: SimEvent | null) => {
+  scroll_hook = useCallback((ev?: SimEvent | Event) => {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return
 
-    if (e) {
-      event_queue.push(e)
+    const t0 = performance.now()
+
+    if (ev) {
+      if ('flag' in ev) {
+        event_queue.push(ev)
+      } else {
+        const target = ev.target as any
+        const top = Math.max(target.scrollTop, 0)
+
+        event_queue.push({
+          target: {
+            scrollTop: top,
+            scrollLeft: target.scrollLeft,
+          },
+          end: target.scrollHeight - target.clientHeight === Math.round(top),
+          flag: SCROLLEVT_NATIVE,
+        })
+      }
+
 
       if (ctx.f_final_top === TOP_CONTINUE) {
-        e.flag = SCROLLEVT_BY_HOOK
-        return RAF_update_self(0)
+        return RAF_update_self(t0)
       }
     }
 
-    if (event_queue.length) {
-      if (HND_RAF.current) cancelAnimationFrame(HND_RAF.current)
-      // requestAnimationFrame, ie >= 10
-      HND_RAF.current = requestAnimationFrame(RAF_update_self)
-    }
-  }, [])
-  const scroll_hook_native = useCallback((e: Event) => {
-    scroll_hook(make_evt(e))
+    if (ctx.HND_RAF) return
+    ctx.HND_RAF = window.setTimeout(() => Promise.resolve().then(() => RAF_update_self(t0)))
   }, [])
 
+
   /* requestAnimationFrame callback */
-  RAF_update_self = useCallback((_: number) => {
+  RAF_update_self = useCallback((time: number) => {
+    ctx.HND_RAF = 0
+
+    const t1 = performance.now()
+    if (t1 - time > 10 && ctx.retry_count-- > 0) {
+      scroll_hook()
+      return
+    }
+
+    ctx.retry_count = 5
+
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return
 
     const evq  = event_queue
@@ -522,12 +569,13 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
     // this always consumes the last element of the event queue.
     e = evq.pop()
+    evq.length = 0
 
     let etop = e.target.scrollTop
     let eleft = e.target.scrollLeft
     const flag = e.flag
 
-    log_debug(ctx, `raf top: ${etop}, left: ${eleft}`)
+    log_debug(ctx, `top: ${etop}, left: ${eleft}`)
 
     // checks every tr's height, which will take some time...
     const offset = scroll_with_offset(
@@ -542,12 +590,11 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
     const prev_tail = ctx._offset_tail
     const prev_top = ctx._offset_top
 
-    let end: boolean
+    let end = false
 
     switch (flag) {
       case SCROLLEVT_INIT:
         log_debug(ctx, 'SCROLLEVT_INIT')
-        end = false
         break
 
       case SCROLLEVT_BY_HOOK:
@@ -559,48 +606,40 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
           end = true
         } else {
           if (ctx.final_top === -1) etop = top
-          end = false
         }
 
         break
 
       case SCROLLEVT_RECOMPUTE:
-        log_debug(ctx, 'SCROLLEVT_RECOMPUTE')
-
         if (head === prev_head && tail === prev_tail && top === prev_top) {
-          HND_RAF.current = 0
-
-          if (evq.length) scroll_hook(null) // consume the next.
           return
         }
 
-        end = false
+        log_debug(ctx, 'SCROLLEVT_RECOMPUTE')
         break
 
 
       case SCROLLEVT_NATIVE:
-        log_debug(ctx, 'SCROLLEVT_NATIVE')
-
-        HND_RAF.current = 0
-        evq.length = 0
-        if (ctx.onScroll) {
-          ctx.onScroll({
-            top: etop,
-            left: eleft,
-            isEnd: e.end!,
-          })
-        }
-
         if (head === prev_head && tail === prev_tail && top === prev_top) {
           return
         }
 
-        end = e.end!
+        log_debug(ctx, 'SCROLLEVT_NATIVE')
+
+        if (ctx.onScroll) {
+          ctx.onScroll({
+            top: etop,
+            left: eleft,
+            isEnd: e.end,
+          })
+        }
+
+        end = e.end
         break
     }
 
     set_offset(ctx, top, head, tail)
-    set_scroll(ctx, etop, eleft, flag, end!)
+    set_scroll(ctx, etop, eleft, flag, end)
     force[1](++ctx.update_count)
   }, [])
 
@@ -638,11 +677,18 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
 
   useEffect(() => {
-    ctx.wrap_inst.current!.parentElement!.onscroll = scroll_hook_native
-  }, [wrap_inst])
+    const el = wrap_inst.current.parentElement
+    try {
+      el.addEventListener('scroll', scroll_hook as any, {
+        passive: true,
+      })
+    } catch {
+      el.addEventListener('scroll', scroll_hook as any, false)
+    }
+  }, [wrap_inst.current])
 
 
-  // it is usually ignored by raf.
+
   useEffect(() => {
     scroll_hook({
       flag: SCROLLEVT_BY_HOOK,
@@ -667,7 +713,6 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
       case SCROLLEVT_INIT:
       case SCROLLEVT_RECOMPUTE:
         scroll_to(ctx, ctx.top, ctx.left)
-        if (event_queue.length) RAF_update_self(0) // consume the next.
         break
     }
   }, [force[0]/* for performance. */])
@@ -675,17 +720,13 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
   useEffect(() => {
     switch (ctx.vt_state) {
-      case e_VT_STATE.INIT:
-        // init vt without the rows.
-        break
-
       case e_VT_STATE.LOADED: // changed by VTRow only.
         ctx.vt_state = e_VT_STATE.RUNNING
 
         // force update.
         scroll_hook({
           target: { scrollTop: ctx.top, scrollLeft: 0 },
-          flag: SCROLLEVT_INIT,
+          flag: SCROLLEVT_BY_HOOK,
         })
         break
 
@@ -706,7 +747,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
       width: style.width,
       minWidth: '100%',
       position: 'relative',
-      // transform: 'matrix(1, 0, 0, 1, 0, 0)',
+      transform: 'translate(0)',
     }),
     [style.width]
   )
@@ -717,6 +758,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
       width: void 0,
       position: 'relative',
       top: ctx._offset_top,
+      transform: 'translate(0)',
     }),
     [ctx._offset_top]
   )
@@ -805,9 +847,9 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
       } else if (len > prev_len) {
         const row_h = ctx.row_height
         if ((len - row_h.length) > 0) {
-          srs_expand(ctx, len, row_h.length, ctx.possible_hight_per_tr)
+          srs_expand(ctx, len, prev_len, ctx.possible_hight_per_tr)
         } else {
-          // calculate the total height quickly.
+          // using an existing array.
           row_h.fill(ctx.possible_hight_per_tr, prev_len, len)
           ctx.computed_h += ctx.possible_hight_per_tr * (len - prev_len)
         }
@@ -887,45 +929,53 @@ const VTRow: React.FC<VRowProps> = (props) => {
 
   const expanded_cls = useMemo(() => `.${row_props.prefixCls}-expanded-row`, [row_props.prefixCls])
 
-  useEffect(() => {
+  const t0 = performance.now()
+
+  useLayoutEffect(() => {
+    const t1 = performance.now()
+    log_debug(ctx, `+idx ${index} tooks ${t1 - t0} ms`)
+
     if (ctx.vt_state === e_VT_STATE.RUNNING) {
-      // apply_h(ctx, index, inst.current.offsetHeight, "dom");
       repainting(ctx)
     } else {
-      console.assert(ctx.vt_state === e_VT_STATE.INIT)
-      ctx.vt_state = e_VT_STATE.LOADED
-      ctx.possible_hight_per_tr = ref.current!.offsetHeight
+      ctx.possible_hight_per_tr = ref.current.offsetHeight
       srs_expand(ctx, ctx.row_count, 0, ctx.possible_hight_per_tr)
-      // create a timeout task.
-      _repainting(ctx, 16)
+      repainting(ctx)
+      ctx.vt_state = e_VT_STATE.LOADED
     }
 
-    return () => repainting(ctx)
+    return () => {
+      repainting(ctx)
+    }
   }, [])
 
 
   useEffect(() => {
-    const rowElm = ref.current
+    ctx.cq.push({
+      index: index,
+      func: () => {
+        const rowElm = ref.current
 
-    // for nested(expanded) elements don't calculate height and add on cache as its already accommodated on parent row
-    // if (!rowElm.matches(".ant-table-row-level-0")) return;
+        if (!rowElm) return
 
-    let h = rowElm!.offsetHeight
-    let sibling = rowElm!.nextSibling as HTMLTableRowElement
-    // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L212
-    // include heights of all expanded rows, in parent rows
-    while (sibling && sibling.matches(expanded_cls)) {
-      h += sibling.offsetHeight
-      sibling = sibling.nextSibling as HTMLTableRowElement
-    }
-    
-    const curr_h = ctx.row_height[index]
-    const last_h = ctx.row_height[last_index.current]
+        let h = rowElm.offsetHeight
+        let sibling = rowElm.nextSibling as HTMLTableRowElement
+        // https://github.com/react-component/table/blob/master/src/Body/BodyRow.tsx#L212
+        // include heights of all expanded rows, in parent rows
+        while (sibling && sibling.matches(expanded_cls)) {
+          h += sibling.offsetHeight
+          sibling = sibling.nextSibling as HTMLTableRowElement
+        }
+        
+        const curr_h = ctx.row_height[index]
+        const last_h = ctx.row_height[last_index.current]
 
-    ctx.computed_h -= curr_h
-    ctx.computed_h += last_h
-    ctx.computed_h += h - last_h
-    ctx.row_height[index] = h
+        ctx.computed_h -= curr_h
+        ctx.computed_h += last_h
+        ctx.computed_h += h - last_h
+        ctx.row_height[index] = h
+      }
+    })
 
     repainting(ctx)
   })
