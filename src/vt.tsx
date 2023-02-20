@@ -235,6 +235,7 @@ function helper_diagnosis(ctx: VT_CONTEXT): void {
   function cb() {
     if (diagnosis(false) !== 0) {
       window.alert('vt: an error occurred!')
+      return
     }
     window.requestIdleCallback ? window.requestIdleCallback(cb) : window.setTimeout(cb)
   }
@@ -522,12 +523,14 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
         event_queue.push(ev)
       } else {
         const target = ev.target as any
+        const top = Math.max(target.scrollTop, 0)
+
         event_queue.push({
           target: {
-            scrollTop: target.scrollTop,
+            scrollTop: top,
             scrollLeft: target.scrollLeft,
           },
-          end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
+          end: target.scrollHeight - target.clientHeight === Math.round(top),
           flag: SCROLLEVT_NATIVE,
         })
       }
