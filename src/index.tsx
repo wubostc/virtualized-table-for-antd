@@ -9,6 +9,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
+/* eslint-disable no-console */
+
 import { TableComponents, _set_components, VtOpts, init } from './vt'
 
 const _brower = 1
@@ -72,5 +74,9 @@ function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
 
   return [ctx._vtcomponents, (components: TableComponents) => _set_components(ctx, components), ctx.ref]
 }
+
+
+console.log('wubostc/virtualized-table-for-antd')
+
 
 export { useVT }

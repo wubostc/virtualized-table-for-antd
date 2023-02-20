@@ -1,3 +1,9 @@
+# 1.3.0
+  1. Fixed a bug on safari.
+  1. Improved the performance.
+  1. Fixed [#136](https://github.com/wubostc/virtualized-table-for-antd/issues/136).
+
+
 # 1.2.2
   1. Supported immutable records([#120](https://github.com/wubostc/virtualized-table-for-antd/issues/120))([#132](https://github.com/wubostc/virtualized-table-for-antd/issues/120)).
   2. Fixed the return type(ts) of the `useVT`.
