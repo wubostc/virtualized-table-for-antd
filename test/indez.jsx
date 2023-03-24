@@ -1,4 +1,4 @@
-import { useVT } from '../../platform/src/components/virtual-table/lib/vt'
+import { useVT } from '../src/index'
 
 
 const EditableCell = (props) => {
