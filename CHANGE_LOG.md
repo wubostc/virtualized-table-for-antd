@@ -1,3 +1,10 @@
+# 1.3.1
+  1. Fixed [#141](https://github.com/wubostc/virtualized-table-for-antd/issues/141).
+  2. Removed an unnecessary print `console.log`.
+
+
+
+
 # 1.3.0
   1. Fixed a bug on safari.
   1. Improved the performance.

@@ -14,7 +14,7 @@
   npm i --save virtualizedtableforantd4
   ```
 
-  + the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
++ the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
     ```typescript
     interface VtOpts {
       id?: number | string;
