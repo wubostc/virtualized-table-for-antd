@@ -28,12 +28,12 @@ const _node = 2
 
 /**
  * @example
- * 
+ *
  * function MyTableComponent() {
- * 
+ *
  * // ... your code
- * 
- * 
+ *
+ *
  * const y = 600;
  * const [ vt, setComponents, vtRef ] = useVT(() => ({
  *  scroll: {
@@ -41,7 +41,7 @@ const _node = 2
  *  }
  * }),
  * [y]);
- * 
+ *
  * // useEffect(() => {
  * //  setComponents({
  * //    body: {
@@ -49,9 +49,9 @@ const _node = 2
  * //    }
  * //  })
  * // });
- * 
+ *
  * // useEffect(() => vtRef.current.toScroll(100), []);
- * 
+ *
  * return (
  *  <Table
  *   columns={columns}
@@ -74,9 +74,6 @@ function useVT(fnOpts: () => VtOpts, deps: React.DependencyList):
 
   return [ctx._vtcomponents, (components: TableComponents) => _set_components(ctx, components), ctx.ref]
 }
-
-
-console.log('wubostc/virtualized-table-for-antd')
 
 
 export { useVT }

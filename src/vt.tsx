@@ -79,6 +79,12 @@ interface VtOpts {
   initTop?: number;
 
   /**
+   * Offset of the table when isEnd becomes true.
+   * @default 0
+   */
+  offset?: number;
+
+  /**
    * @default false
    */
   debug?: boolean;
@@ -115,7 +121,7 @@ interface VT_CONTEXT extends VtOpts {
   components: TableComponents;    // implementation layer.
   vt_state: e_VT_STATE;
   possible_hight_per_tr: number;
-  
+
   /* 0: needn't to recalculate, > 0: to add, < 0 to subtract */
   re_computed: number;
   row_height: number[];
@@ -267,7 +273,7 @@ const TableImpl = React.forwardRef<any>(function TableImpl(props, ref) {
 })
 /** AntD.TableComponent.body.wrapper */
 function WrapperImpl(props: any): JSX.Element {
-  return <tbody {...props} /> 
+  return <tbody {...props} />
 }
 /** AntD.TableComponent.body.row */
 const RowImpl = React.forwardRef<any>(function RowImpl(props, ref) {
@@ -277,7 +283,7 @@ const RowImpl = React.forwardRef<any>(function RowImpl(props, ref) {
 
 /**
  * O(n)
- * returns offset: [head, tail, top] 
+ * returns offset: [head, tail, top]
  */
 function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, number] {
 
@@ -332,7 +338,7 @@ function scroll_with_offset(ctx: VT_CONTEXT, top: number): [number, number, numb
     _top -= row_height[--i]
   }
   j += overscanRowCount!
-  
+
   if (j > row_count) j = row_count
   // returns [head, tail, top].
   return [0 | i, 0 | j, 0 | _top]
@@ -530,7 +536,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
             scrollTop: top,
             scrollLeft: target.scrollLeft,
           },
-          end: target.scrollHeight - target.clientHeight === Math.round(top),
+          end: Math.abs(target.scrollHeight - target.clientHeight - Math.round(top)) <= (ctx.offset || 0),
           flag: SCROLLEVT_NATIVE,
         })
       }
@@ -857,7 +863,7 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
 
       /**
        * tree-structure if indent is not 0
-       *        |  idx                              
+       *        |  idx
        *        |   0   || 0a                                 0  || 0a
        *        |   1   || 0b     --collapse occurred--       1  || 0b
        *        |   2   || - 1                             5->2  || 0c
@@ -867,10 +873,10 @@ const VWrapper: React.FC<VWrapperProps> = (props) => {
        *        |   6   || 0d                              9->6  ||   - 2
        *        |   7   || 0e                             10->7  ||     - 3
        *  tail  |   8   || - 1                            11->8  || 0f
-       *        |   9   ||  - 2     
-       *        |  10   ||    - 3      
-       *        |  11   || 0f     
-       *        |  12   ||    
+       *        |   9   ||  - 2
+       *        |  10   ||    - 3
+       *        |  11   || 0f
+       *        |  12   ||
        */
       if (len) {
         let idx = head
@@ -966,7 +972,7 @@ const VTRow: React.FC<VRowProps> = (props) => {
           h += sibling.offsetHeight
           sibling = sibling.nextSibling as HTMLTableRowElement
         }
-        
+
         const curr_h = ctx.row_height[index]
         const last_h = ctx.row_height[last_index.current]
 
@@ -992,7 +998,7 @@ function _set_components(ctx: VT_CONTEXT, components: TableComponents): void {
   ctx.components.body = { ...ctx.components.body, ...body }
   if (body && body.cell) {
     ctx._vtcomponents.body.cell = body.cell
-  } 
+  }
   if (header) {
     ctx.components.header = header
     ctx._vtcomponents.header = header

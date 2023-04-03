@@ -14,43 +14,49 @@
   npm i --save virtualizedtableforantd4
   ```
 
-+ the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
-  ```typescript
-  interface VtOpts {
-    id?: number | string;
-    /**
-     * @default 5
-     */
-    overscanRowCount?: number;
+  + the opts of `useVT`([examples](https://github.com/wubostc/virtualized-table-for-antd/blob/master/test))
+    ```typescript
+    interface VtOpts {
+      id?: number | string;
+      /**
+       * @default 5
+       */
+      overscanRowCount?: number;
 
-    /**
-     * this only needs the scroll.y
-     */
-    scroll: {
-        y: number | string;
-    };
+      /**
+       * this only needs the scroll.y
+       */
+      scroll: {
+          y: number | string;
+      };
 
-    /**
-     * wheel event(only works on native events).
-     */
-    onScroll?: ({ left, top, isEnd, }:
-      { top: number; left: number; isEnd: boolean }) => void;
+      /**
+       * wheel event(only works on native events).
+       */
+      onScroll?: ({ left, top, isEnd, }:
+        { top: number; left: number; isEnd: boolean }) => void;
 
-    initTop?: number;
+      initTop?: number;
+  
+      /**
+       * Offset of the table when isEnd becomes true.
+       * @default 0
+       */
+      offset?: number;
 
-    /**
-     * @default false
-     */
-    debug?: boolean;
+      /**
+       * @default false
+       */
+      debug?: boolean;
 
 
-    // pass -1 means scroll to the bottom of the table
-    ref?: React.MutableRefObject<{
-      scrollTo: (y: number) => void;
-      scrollToIndex: (idx: number) => void;
-    }>
-  }
-  ```
+      // pass -1 means scroll to the bottom of the table
+      ref?: React.MutableRefObject<{
+        scrollTo: (y: number) => void;
+        scrollToIndex: (idx: number) => void;
+      }>
+    }
+    ```
 
 
 + Quick start
