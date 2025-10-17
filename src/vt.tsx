@@ -626,7 +626,7 @@ const VTable: React.ForwardRefRenderFunction<RefObject, VTableProps> = (props, r
 
 
       case SCROLLEVT_NATIVE:
-        if (head === prev_head && tail === prev_tail && top === prev_top) {
+        if (head === prev_head && tail === prev_tail && top === prev_top && e.end === end) {
           return
         }
 
