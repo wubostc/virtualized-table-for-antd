@@ -1,3 +1,6 @@
+# 1.3.2
+  1. Fixed [make sure onScroll with isEnd = true is called](https://github.com/wubostc/virtualized-table-for-antd/pull/157).
+
 # 1.3.1
   1. Fixed [#141](https://github.com/wubostc/virtualized-table-for-antd/issues/141).
   2. Removed an unnecessary print `console.log`.
